@@ -1,10 +1,29 @@
-import { gateway } from "@ai-sdk/gateway";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   customProvider,
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from "ai";
 import { isTestEnvironment } from "../constants";
+
+// Direct provider instances (bypasses Vercel AI Gateway)
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+});
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// Moonshot/Kimi uses OpenAI-compatible API
+const moonshot = createOpenAI({
+  apiKey: process.env.MOONSHOT_API_KEY,
+  baseURL: "https://api.moonshot.cn/v1",
+});
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
 
@@ -27,6 +46,24 @@ export const myProvider = isTestEnvironment
     })()
   : null;
 
+function getProviderModel(modelId: string) {
+  const [provider, ...modelParts] = modelId.split("/");
+  const model = modelParts.join("/");
+
+  switch (provider) {
+    case "google":
+      return google(model);
+    case "openai":
+      return openai(model);
+    case "anthropic":
+      return anthropic(model);
+    case "moonshot":
+      return moonshot(model);
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
+}
+
 export function getLanguageModel(modelId: string) {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel(modelId);
@@ -36,29 +73,27 @@ export function getLanguageModel(modelId: string) {
     modelId.includes("reasoning") || modelId.endsWith("-thinking");
 
   if (isReasoningModel) {
-    const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
+    const cleanModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
 
     return wrapLanguageModel({
-      model: gateway.languageModel(gatewayModelId),
+      model: getProviderModel(cleanModelId),
       middleware: extractReasoningMiddleware({ tagName: "thinking" }),
     });
   }
 
-  return gateway.languageModel(modelId);
+  return getProviderModel(modelId);
 }
 
 export function getTitleModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("title-model");
   }
-  // Use Gemini Flash for titles (cost effective)
-  return gateway.languageModel("google/gemini-2.5-flash");
+  return google("gemini-2.5-flash");
 }
 
 export function getArtifactModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("artifact-model");
   }
-  // Use GPT-4o for artifacts
-  return gateway.languageModel("openai/gpt-4o");
+  return openai("gpt-4o");
 }
