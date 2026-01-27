@@ -23,7 +23,6 @@ const anthropic = createAnthropic({
 const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
-  compatibility: "compatible",
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
