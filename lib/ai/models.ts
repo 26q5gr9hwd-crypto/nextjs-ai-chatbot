@@ -1,5 +1,11 @@
-// Friends version - limited models
+// Friends version - email-gated model access
 export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash";
+
+// Allowed emails for premium models
+export const PREMIUM_EMAILS = [
+  "danieldj@mail.ru",
+  "getty.dan.14@gmail.com",
+];
 
 export type ChatModel = {
   id: string;
@@ -8,7 +14,8 @@ export type ChatModel = {
   description: string;
 };
 
-export const chatModels: ChatModel[] = [
+// Base models available to all users
+export const baseModels: ChatModel[] = [
   // Moonshot (Kimi)
   {
     id: "moonshot/kimi-k2-0905",
@@ -38,14 +45,43 @@ export const chatModels: ChatModel[] = [
   },
 ];
 
-// Group models by provider for UI
-export const modelsByProvider = chatModels.reduce(
-  (acc, model) => {
-    if (!acc[model.provider]) {
-      acc[model.provider] = [];
-    }
-    acc[model.provider].push(model);
-    return acc;
+// Premium models (only for allowed emails)
+export const premiumModels: ChatModel[] = [
+  {
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
+    provider: "anthropic",
+    description: "Best balance of speed, intelligence, and cost",
   },
-  {} as Record<string, ChatModel[]>
-);
+  {
+    id: "anthropic/claude-haiku-4.5",
+    name: "Claude Haiku 4.5",
+    provider: "anthropic",
+    description: "Fast and affordable, great for everyday tasks",
+  },
+];
+
+// Get models based on user email
+export function getChatModels(userEmail?: string): ChatModel[] {
+  const email = userEmail?.toLowerCase();
+  const isPremium = email && PREMIUM_EMAILS.includes(email);
+  
+  return isPremium ? [...baseModels, ...premiumModels] : baseModels;
+}
+
+// Legacy export for backwards compatibility
+export const chatModels = baseModels;
+
+// Group models by provider for UI
+export function getModelsByProvider(userEmail?: string) {
+  return getChatModels(userEmail).reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = [];
+      }
+      acc[model.provider].push(model);
+      return acc;
+    },
+    {} as Record<string, ChatModel[]>
+  );
+}
