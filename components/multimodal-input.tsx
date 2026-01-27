@@ -50,7 +50,7 @@ import type { VisibilityType } from "./visibility-selector";
 function setCookie(name: string, value: string) {
   const maxAge = 60 * 60 * 24 * 365; // 1 year
   // biome-ignore lint/suspicious/noDocumentCookie: needed for client-side cookie setting
-  document.cookie = \`\${name}=\${encodeURIComponent(value)}; path=/; max-age=\${maxAge}\`;
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}`;
 }
 
 function PureMultimodalInput({
