@@ -73,13 +73,13 @@ function PureMultimodalInput({
   chatId: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
-  status: UseChatHelpers<ChatMessage>\["status"\];
+  status: UseChatHelpers<ChatMessage>["status"];
   stop: () => void;
-  attachments: Attachment\[\];
-  setAttachments: Dispatch<SetStateAction<Attachment\[\]>>;
-  messages: UIMessage\[\];
-  setMessages: UseChatHelpers<ChatMessage>\["setMessages"\];
-  sendMessage: UseChatHelpers<ChatMessage>\["sendMessage"\];
+  attachments: Attachment[];
+  setAttachments: Dispatch<SetStateAction<Attachment[]>>;
+  messages: UIMessage[];
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   className?: string;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
@@ -93,13 +93,13 @@ function PureMultimodalInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "44px";
     }
-  }, \[\]);
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
       adjustHeight();
     }
-  }, \[adjustHeight\]);
+  }, [adjustHeight]);
 
   const hasAutoFocused = useRef(false);
   useEffect(() => {
@@ -110,15 +110,15 @@ function PureMultimodalInput({
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, \[width\]);
+  }, [width]);
 
   const resetHeight = useCallback(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "44px";
     }
-  }, \[\]);
+  }, []);
 
-  const \[localStorageInput, setLocalStorageInput\] = useLocalStorage(
+  const [localStorageInput, setLocalStorageInput] = useLocalStorage(
     "input",
     ""
   );
@@ -133,25 +133,25 @@ function PureMultimodalInput({
     }
     // Only run once after hydration
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, \[adjustHeight, localStorageInput, setInput\]);
+  }, [adjustHeight, localStorageInput, setInput]);
 
   useEffect(() => {
     setLocalStorageInput(input);
-  }, \[input, setLocalStorageInput\]);
+  }, [input, setLocalStorageInput]);
 
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const \[uploadQueue, setUploadQueue\] = useState<string\[\]>(\[\]);
+  const [uploadQueue, setUploadQueue] = useState<string[]>([]);
 
   const submitForm = useCallback(() => {
-    window.history.pushState({}, "", \`/chat/\${chatId}\`);
+    window.history.pushState({}, "", `/chat/${chatId}`);
 
     sendMessage({
       role: "user",
-      parts: \[
+      parts: [
         ...attachments.map((attachment) => ({
           type: "file" as const,
           url: attachment.url,
@@ -162,10 +162,10 @@ function PureMultimodalInput({
           type: "text",
           text: input,
         },
-      \],
+      ],
     });
 
-    setAttachments(\[\]);
+    setAttachments([]);
     setLocalStorageInput("");
     resetHeight();
     setInput("");
@@ -173,7 +173,7 @@ function PureMultimodalInput({
     if (width && width > 768) {
       textareaRef.current?.focus();
     }
-  }, \[
+  }, [
     input,
     setInput,
     attachments,
@@ -183,7 +183,7 @@ function PureMultimodalInput({
     width,
     chatId,
     resetHeight,
-  \]);
+  ]);
 
   const uploadFile = useCallback(async (file: File) => {
     const formData = new FormData();
@@ -210,11 +210,11 @@ function PureMultimodalInput({
     } catch (_error) {
       toast.error("Failed to upload file, please try again!");
     }
-  }, \[\]);
+  }, []);
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(event.target.files || \[\]);
+      const files = Array.from(event.target.files || []);
 
       setUploadQueue(files.map((file) => file.name));
 
@@ -225,17 +225,17 @@ function PureMultimodalInput({
           (attachment) => attachment !== undefined
         );
 
-        setAttachments((currentAttachments) => \[
+        setAttachments((currentAttachments) => [
           ...currentAttachments,
           ...successfullyUploadedAttachments,
-        \]);
+        ]);
       } catch (error) {
         console.error("Error uploading files!", error);
       } finally {
-        setUploadQueue(\[\]);
+        setUploadQueue([]);
       }
     },
-    \[setAttachments, uploadFile\]
+    [setAttachments, uploadFile]
   );
 
   const handlePaste = useCallback(
@@ -256,7 +256,7 @@ function PureMultimodalInput({
       // Prevent default paste behavior for images
       event.preventDefault();
 
-      setUploadQueue((prev) => \[...prev, "Pasted image"\]);
+      setUploadQueue((prev) => [...prev, "Pasted image"]);
 
       try {
         const uploadPromises = imageItems
@@ -272,18 +272,18 @@ function PureMultimodalInput({
             attachment.contentType !== undefined
         );
 
-        setAttachments((curr) => \[
+        setAttachments((curr) => [
           ...curr,
-          ...(successfullyUploadedAttachments as Attachment\[\]),
-        \]);
+          ...(successfullyUploadedAttachments as Attachment[]),
+        ]);
       } catch (error) {
         console.error("Error uploading pasted images:", error);
         toast.error("Failed to upload pasted image(s)");
       } finally {
-        setUploadQueue(\[\]);
+        setUploadQueue([]);
       }
     },
-    \[setAttachments, uploadFile\]
+    [setAttachments, uploadFile]
   );
 
   // Add paste event listener to textarea
@@ -295,7 +295,7 @@ function PureMultimodalInput({
 
     textarea.addEventListener("paste", handlePaste);
     return () => textarea.removeEventListener("paste", handlePaste);
-  }, \[handlePaste\]);
+  }, [handlePaste]);
 
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
@@ -354,7 +354,11 @@ function PureMultimodalInput({
 
             {uploadQueue.map((filename) => (
               <PreviewAttachment
-                attachment= name: filename, url: "", contentType: "" 
+                attachment={{
+                  name: filename,
+                  url: "",
+                  contentType: "",
+                }}
                 isUploading={true}
                 key={filename}
               />
@@ -363,7 +367,7 @@ function PureMultimodalInput({
         )}
         <div className="flex flex-row items-start gap-1 sm:gap-2">
           <PromptInputTextarea
-            className="grow resize-none border-0! border-none! bg-transparent p-2 text-base outline-none ring-0 \[-ms-overflow-style:none\] \[scrollbar-width:none\] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 \[&::-webkit-scrollbar\]:hidden"
+            className="grow resize-none border-0 border-none bg-transparent p-2 text-base outline-none ring-0 [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-scrollbar]:hidden"
             data-testid="multimodal-input"
             disableAutoResize={true}
             maxHeight={200}
@@ -375,7 +379,7 @@ function PureMultimodalInput({
             value={input}
           />
         </div>
-        <PromptInputToolbar className="border-top-0! border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
+        <PromptInputToolbar className="border-top-0 border-t-0 p-0 shadow-none dark:border-0 dark:border-transparent">
           <PromptInputTools className="gap-0 sm:gap-0.5">
             <AttachmentsButton
               fileInputRef={fileInputRef}
@@ -439,7 +443,7 @@ function PureAttachmentsButton({
   selectedModelId,
 }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
-  status: UseChatHelpers<ChatMessage>\["status"\];
+  status: UseChatHelpers<ChatMessage>["status"];
   selectedModelId: string;
 }) {
   const isReasoningModel =
@@ -472,7 +476,7 @@ function PureModelSelectorCompact({
   onModelChange?: (modelId: string) => void;
   userEmail?: string;
 }) {
-  const \[open, setOpen\] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const availableModels = getChatModels(userEmail);
   const groupedModels = getModelsByProvider(userEmail);
@@ -480,8 +484,8 @@ function PureModelSelectorCompact({
   const selectedModel =
     availableModels.find((m) => m.id === selectedModelId) ??
     availableModels.find((m) => m.id === DEFAULT_CHAT_MODEL) ??
-    availableModels\[0\];
-  const \[provider\] = selectedModel.id.split("/");
+    availableModels[0];
+  const [provider] = selectedModel.id.split("/");
 
   // Provider display names
   const providerNames: Record<string, string> = {
@@ -496,7 +500,7 @@ function PureModelSelectorCompact({
   return (
     <ModelSelector onOpenChange={setOpen} open={open}>
       <ModelSelectorTrigger asChild>
-        <Button className="h-8 w-\[200px\] justify-between px-2" variant="ghost">
+        <Button className="h-8 w-[200px] justify-between px-2" variant="ghost">
           {provider && <ModelSelectorLogo provider={provider} />}
           <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
         </Button>
@@ -504,35 +508,33 @@ function PureModelSelectorCompact({
       <ModelSelectorContent>
         <ModelSelectorInput placeholder="Search models..." />
         <ModelSelectorList>
-          {Object.entries(groupedModels).map(
-            (\[providerKey, providerModels\]) => (
-              <ModelSelectorGroup
-                heading={providerNames\[providerKey\] ?? providerKey}
-                key={providerKey}
-              >
-                {providerModels.map((model) => {
-                  const logoProvider = model.id.split("/")\[0\];
-                  return (
-                    <ModelSelectorItem
-                      key={model.id}
-                      onSelect={() => {
-                        onModelChange?.(model.id);
-                        setCookie("chat-model", model.id);
-                        setOpen(false);
-                      }}
-                      value={model.id}
-                    >
-                      <ModelSelectorLogo provider={logoProvider} />
-                      <ModelSelectorName>{model.name}</ModelSelectorName>
-                      {model.id === selectedModel.id && (
-                        <CheckIcon className="ml-auto size-4" />
-                      )}
-                    </ModelSelectorItem>
-                  );
-                })}
-              </ModelSelectorGroup>
-            )
-          )}
+          {Object.entries(groupedModels).map(([providerKey, providerModels]) => (
+            <ModelSelectorGroup
+              heading={providerNames[providerKey] ?? providerKey}
+              key={providerKey}
+            >
+              {providerModels.map((model) => {
+                const logoProvider = model.id.split("/")[0];
+                return (
+                  <ModelSelectorItem
+                    key={model.id}
+                    onSelect={() => {
+                      onModelChange?.(model.id);
+                      setCookie("chat-model", model.id);
+                      setOpen(false);
+                    }}
+                    value={model.id}
+                  >
+                    <ModelSelectorLogo provider={logoProvider} />
+                    <ModelSelectorName>{model.name}</ModelSelectorName>
+                    {model.id === selectedModel.id && (
+                      <CheckIcon className="ml-auto size-4" />
+                    )}
+                  </ModelSelectorItem>
+                );
+              })}
+            </ModelSelectorGroup>
+          ))}
         </ModelSelectorList>
       </ModelSelectorContent>
     </ModelSelector>
@@ -546,7 +548,7 @@ function PureStopButton({
   setMessages,
 }: {
   stop: () => void;
-  setMessages: UseChatHelpers<ChatMessage>\["setMessages"\];
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
 }) {
   return (
     <Button
