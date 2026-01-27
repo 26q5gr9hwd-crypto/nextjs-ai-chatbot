@@ -22,7 +22,8 @@ const anthropic = createAnthropic({
 // Moonshot/Kimi uses OpenAI-compatible API
 const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
-  baseURL: "https://api.moonshot.cn/v1",
+  baseURL: "https://api.moonshot.ai/v1",
+  compatibility: "compatible",
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
