@@ -51,12 +51,14 @@ export function getTitleModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("title-model");
   }
-  return gateway.languageModel("google/gemini-2.5-flash-lite");
+  // Use Gemini Flash for titles (cost effective)
+  return gateway.languageModel("google/gemini-2.5-flash");
 }
 
 export function getArtifactModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("artifact-model");
   }
-  return gateway.languageModel("anthropic/claude-haiku-4.5");
+  // Use GPT-4o for artifacts
+  return gateway.languageModel("openai/gpt-4o");
 }
