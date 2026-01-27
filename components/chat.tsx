@@ -225,7 +225,7 @@ export function Chat({
               setMessages={setMessages}
               status={status}
               stop={stop}
-              userEmail={session?.user?.email}
+              userEmail={session?.user?.email ?? undefined}
             />
           )}
         </div>
