@@ -68,7 +68,6 @@ export function Chat({
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
-
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
@@ -190,7 +189,7 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
+      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background/95 backdrop-blur-sm">
         <ChatHeader
           chatId={id}
           isReadonly={isReadonly}
@@ -210,7 +209,7 @@ export function Chat({
           votes={votes}
         />
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-gradient-to-t from-background via-background to-transparent px-2 pb-4 pt-6 md:px-4 md:pb-6">
           {!isReadonly && (
             <MultimodalInput
               attachments={attachments}
@@ -226,7 +225,7 @@ export function Chat({
               setMessages={setMessages}
               status={status}
               stop={stop}
-              userEmail={session?.user?.email ?? undefined}
+              userEmail={session?.user?.email}
             />
           )}
         </div>
