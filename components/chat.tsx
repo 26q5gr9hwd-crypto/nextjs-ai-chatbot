@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSession } from "next-auth/react";
 import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
@@ -48,6 +49,7 @@ export function Chat({
   autoResume: boolean;
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
 
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -223,6 +225,7 @@ export function Chat({
               setMessages={setMessages}
               status={status}
               stop={stop}
+              userEmail={session?.user?.email}
             />
           )}
         </div>
