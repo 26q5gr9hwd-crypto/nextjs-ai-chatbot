@@ -16,19 +16,6 @@ export type ChatModel = {
 
 // Base models available to all users
 export const baseModels: ChatModel[] = [
-  // Moonshot (Kimi)
-  {
-    id: "moonshot/kimi-k2-0905",
-    name: "Kimi K2 (9205)",
-    provider: "moonshot",
-    description: "Kimi K2 model with strong reasoning",
-  },
-  {
-    id: "moonshot/kimi-k2.5",
-    name: "Kimi K2.5",
-    provider: "moonshot",
-    description: "Latest Kimi model with enhanced capabilities",
-  },
   // Google
   {
     id: "google/gemini-2.5-flash",
@@ -36,28 +23,48 @@ export const baseModels: ChatModel[] = [
     provider: "google",
     description: "Fast and capable Google model",
   },
+  {
+    id: "google/gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "google",
+    description: "Most capable Google model",
+  },
+  // Moonshot (Kimi) - free for all
+  {
+    id: "moonshot/kimi-k2.5",
+    name: "Kimi K2.5",
+    provider: "moonshot",
+    description: "Latest Kimi model with enhanced capabilities",
+  },
+  {
+    id: "moonshot/kimi-k2-0905",
+    name: "Kimi K2",
+    provider: "moonshot",
+    description: "Kimi K2 model with strong reasoning",
+  },
+];
+
+// Premium models (only for allowed emails)
+export const premiumModels: ChatModel[] = [
+  // Anthropic - correct model IDs
+  {
+    id: "anthropic/claude-sonnet-4-5-20250929",
+    name: "Claude Sonnet 4.5",
+    provider: "anthropic",
+    description: "Best balance of speed, intelligence, and cost",
+  },
+  {
+    id: "anthropic/claude-haiku-4-5-20251001",
+    name: "Claude Haiku 4.5",
+    provider: "anthropic",
+    description: "Fast and affordable, great for everyday tasks",
+  },
   // OpenAI
   {
     id: "openai/gpt-4o",
     name: "GPT-4o",
     provider: "openai",
     description: "OpenAI's flagship multimodal model",
-  },
-];
-
-// Premium models (only for allowed emails)
-export const premiumModels: ChatModel[] = [
-  {
-    id: "anthropic/claude-sonnet-4.5",
-    name: "Claude Sonnet 4.5",
-    provider: "anthropic",
-    description: "Best balance of speed, intelligence, and cost",
-  },
-  {
-    id: "anthropic/claude-haiku-4.5",
-    name: "Claude Haiku 4.5",
-    provider: "anthropic",
-    description: "Fast and affordable, great for everyday tasks",
   },
 ];
 
