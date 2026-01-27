@@ -68,6 +68,7 @@ export function Chat({
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
+
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
@@ -225,7 +226,7 @@ export function Chat({
               setMessages={setMessages}
               status={status}
               stop={stop}
-              userEmail={session?.user?.email}
+              userEmail={session?.user?.email ?? undefined}
             />
           )}
         </div>
