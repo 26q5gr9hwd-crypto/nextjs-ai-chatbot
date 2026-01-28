@@ -11,8 +11,9 @@ import { convertToUIMessages } from "@/lib/utils";
 
 export default function Page(props: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div className="flex h-dvh" />}>
+    <Suspense fallback={<div>Loading...</div>}>
       <ChatPage params={props.params} />
+      <DataStreamHandler />
     </Suspense>
   );
 }
@@ -50,18 +51,21 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const chatModelFromCookie = cookieStore.get("chat-model");
 
+  // Check if Redis is configured for stream resumption
+  const canAutoResume = !!process.env.REDIS_URL;
+
   if (!chatModelFromCookie) {
     return (
       <>
         <Chat
-          autoResume={true}
-          id={chat.id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
+          key={id}
+          id={id}
           initialMessages={uiMessages}
+          initialChatModel={DEFAULT_CHAT_MODEL}
           initialVisibilityType={chat.visibility}
-          isReadonly={session?.user?.id !== chat.userId}
+          isReadonly={session.user?.id !== chat.userId}
+          autoResume={false} // Disabled: abort on refresh breaks resumption
         />
-        <DataStreamHandler />
       </>
     );
   }
@@ -69,14 +73,14 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
       <Chat
-        autoResume={true}
-        id={chat.id}
-        initialChatModel={chatModelFromCookie.value}
+        key={id}
+        id={id}
         initialMessages={uiMessages}
+        initialChatModel={chatModelFromCookie.value}
         initialVisibilityType={chat.visibility}
-        isReadonly={session?.user?.id !== chat.userId}
+        isReadonly={session.user?.id !== chat.userId}
+        autoResume={false} // Disabled: abort on refresh breaks resumption
       />
-      <DataStreamHandler />
     </>
   );
 }
