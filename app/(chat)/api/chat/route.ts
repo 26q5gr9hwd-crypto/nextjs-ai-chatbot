@@ -136,6 +136,11 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    // Track assistant message ID for abort handling
+    let assistantMessageId: string | null = null;
+    let assistantMessageParts: any[] = [];
+    let streamAborted = false;
+
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
       execute: async ({ writer: dataStream }) => {
@@ -169,6 +174,22 @@ export async function POST(request: Request) {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
           },
+          // Capture message data as it streams for abort recovery
+          onChunk: ({ chunk }) => {
+            if (chunk.type === "text-delta" && chunk.textDelta) {
+              // Accumulate text for potential abort save
+              if (assistantMessageParts.length === 0) {
+                assistantMessageParts.push({ type: "text", text: chunk.textDelta });
+              } else {
+                const lastPart = assistantMessageParts[assistantMessageParts.length - 1];
+                if (lastPart.type === "text") {
+                  lastPart.text += chunk.textDelta;
+                } else {
+                  assistantMessageParts.push({ type: "text", text: chunk.textDelta });
+                }
+              }
+            }
+          },
         });
 
         dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
@@ -179,7 +200,14 @@ export async function POST(request: Request) {
           updateChatTitleById({ chatId: id, title });
         }
       },
-      generateId: generateUUID,
+      generateId: () => {
+        const newId = generateUUID();
+        // Capture the assistant message ID when it's generated
+        if (!assistantMessageId) {
+          assistantMessageId = newId;
+        }
+        return newId;
+      },
       onFinish: async ({ messages: finishedMessages }) => {
         if (isToolApprovalFlow) {
           for (const finishedMsg of finishedMessages) {
@@ -218,6 +246,39 @@ export async function POST(request: Request) {
         }
       },
       onError: () => "Oops, an error occurred!",
+    });
+
+    // Handle abort signal to save partial responses
+    request.signal.addEventListener("abort", async () => {
+      streamAborted = true;
+      // Save whatever we have accumulated if there's content
+      if (assistantMessageId && assistantMessageParts.length > 0) {
+        const textContent = assistantMessageParts
+          .filter((p) => p.type === "text")
+          .map((p) => p.text)
+          .join("");
+        
+        // Only save if we have meaningful content (more than just a few chars)
+        if (textContent.length > 10) {
+          try {
+            await saveMessages({
+              messages: [
+                {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  parts: [{ type: "text", text: textContent + "\n\n*[Response interrupted]*" }],
+                  createdAt: new Date(),
+                  attachments: [],
+                  chatId: id,
+                },
+              ],
+            });
+          } catch (e) {
+            // Ignore save errors on abort - best effort
+            console.error("Failed to save partial message on abort:", e);
+          }
+        }
+      }
     });
 
     return createUIMessageStreamResponse({
