@@ -54,13 +54,13 @@ function wrapMoonshotModel<T extends { doGenerate: Function; doStream: Function 
   };
   return {
     ...model,
-    async doGenerate(options) {
+    async doGenerate(options: any) {
       return model.doGenerate(filterEmptyAssistantMessages(options));
     },
-    async doStream(options) {
+    async doStream(options: any) {
       return model.doStream(filterEmptyAssistantMessages(options));
     },
-  };
+  } as T;
 }
 // Moonshot provider with empty message filtering
 const moonshot = (modelId: string) => wrapMoonshotModel(moonshotBase(modelId));
