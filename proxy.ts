@@ -16,6 +16,10 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
+  // Allow external webhooks (no cookies) to hit API routes directly
+if (pathname === "/api/kimi-webhook") {
+  return NextResponse.next();
+}
 
   const token = await getToken({
     req: request,
