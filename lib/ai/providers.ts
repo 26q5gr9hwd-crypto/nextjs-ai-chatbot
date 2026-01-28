@@ -6,6 +6,8 @@ import {
   customProvider,
   extractReasoningMiddleware,
   wrapLanguageModel,
+  type LanguageModelV1,
+  type LanguageModelV1CallOptions,
 } from "ai";
 import { isTestEnvironment } from "../constants";
 
@@ -24,11 +26,45 @@ const anthropic = createAnthropic({
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-const moonshot = createOpenAICompatible({
+const moonshotBase = createOpenAICompatible({
   name: "moonshot",
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
 });
+// Wrapper to filter empty assistant messages for Moonshot reasoning models
+// Kimi k2.5 and k2-thinking reject assistant messages with empty content
+function wrapMoonshotModel(model: LanguageModelV1): LanguageModelV1 {
+  const filterEmptyAssistantMessages = (options: LanguageModelV1CallOptions) => {
+    if (options.prompt) {
+      options.prompt = options.prompt.filter((msg) => {
+        if (msg.role === "assistant") {
+          // Check if assistant message has actual content
+          if (!msg.content || msg.content.length === 0) return false;
+          // Check if all parts are empty
+          const hasContent = msg.content.some((part: any) => {
+            if (part.type === "text") return part.text?.trim();
+            if (part.type === "tool-call") return true;
+            return false;
+          });
+          return hasContent;
+        }
+        return true;
+      });
+    }
+    return options;
+  };
+  return {
+    ...model,
+    async doGenerate(options) {
+      return model.doGenerate(filterEmptyAssistantMessages(options));
+    },
+    async doStream(options) {
+      return model.doStream(filterEmptyAssistantMessages(options));
+    },
+  };
+}
+// Moonshot provider with empty message filtering
+const moonshot = (modelId: string) => wrapMoonshotModel(moonshotBase(modelId));
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
 const NO_REASONING_SUFFIX_REGEX = /-no-reasoning$/;
@@ -64,7 +100,7 @@ function getProviderModel(modelId: string) {
     case "anthropic":
       return anthropic(model);
     case "moonshot":
-      return moonshot(model);
+      return moonshot(model); // Already wrapped with empty message filter
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
@@ -82,7 +118,8 @@ export function getLanguageModel(modelId: string) {
   }
 
   // Reasoning variant: extract <thinking>...</thinking> if the model outputs it
-  if (modelId.endsWith("-thinking")) {
+  // Skip for Moonshot - their "-thinking" suffix is the actual model name (kimi-k2-thinking)
+  if (modelId.endsWith("-thinking") && !modelId.startsWith("moonshot/")) {
     const cleanModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
 
     return wrapLanguageModel({
