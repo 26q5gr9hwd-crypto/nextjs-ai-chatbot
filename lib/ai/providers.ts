@@ -6,9 +6,9 @@ import {
   customProvider,
   extractReasoningMiddleware,
   wrapLanguageModel,
-  type LanguageModelV1,
-  type LanguageModelV1CallOptions,
+  type LanguageModel,
 } from "ai";
+import type { LanguageModelV1CallOptions } from "@ai-sdk/provider";
 import { isTestEnvironment } from "../constants";
 
 // Direct provider instances (bypasses Vercel AI Gateway)
@@ -33,7 +33,7 @@ const moonshotBase = createOpenAICompatible({
 });
 // Wrapper to filter empty assistant messages for Moonshot reasoning models
 // Kimi k2.5 and k2-thinking reject assistant messages with empty content
-function wrapMoonshotModel(model: LanguageModelV1): LanguageModelV1 {
+function wrapMoonshotModel(model: LanguageModel): LanguageModel {
   const filterEmptyAssistantMessages = (options: LanguageModelV1CallOptions) => {
     if (options.prompt) {
       options.prompt = options.prompt.filter((msg) => {
