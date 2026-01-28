@@ -34,13 +34,25 @@ export const baseModels: ChatModel[] = [
     id: "moonshot/kimi-k2.5",
     name: "Kimi K2.5",
     provider: "moonshot",
-    description: "Latest Kimi model with enhanced capabilities",
+    description: "Latest Kimi K2.5 model with enhanced capabilities",
   },
   {
-    id: "moonshot/kimi-k2-0905",
-    name: "Kimi K2",
+    id: "moonshot/kimi-k2.5-reasoning",
+    name: "Kimi K2.5 (Reasoning)",
     provider: "moonshot",
-    description: "Kimi K2 model with strong reasoning",
+    description: "Kimi K2.5 with reasoning enabled",
+  },
+  {
+    id: "moonshot/kimi-k2-turbo-preview",
+    name: "Kimi K2 Turbo Preview",
+    provider: "moonshot",
+    description: "Kimi K2 preview with turbo performance",
+  },
+  {
+    id: "moonshot/kimi-k2-thinking-turbo",
+    name: "Kimi K2 Thinking Turbo",
+    provider: "moonshot",
+    description: "Kimi K2 with thinking/reasoning enabled",
   },
 ];
 
