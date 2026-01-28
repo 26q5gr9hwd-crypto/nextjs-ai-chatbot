@@ -9,29 +9,6 @@ export const maxDuration = 120;
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const n2m = new NotionToMarkdown({ notionClient: notion });
 
-// Role-specific prompts based on content type
-function detectRolePrompt(content: string): string {
-  const lower = content.toLowerCase();
-  
-  if (lower.includes("revenue") || lower.includes("финанс") || lower.includes("бюджет") || lower.includes("p&l")) {
-    return "You are a CFO-level financial analyst. Focus on financial metrics, trends, risks, and actionable recommendations.";
-  }
-  if (lower.includes("competitor") || lower.includes("конкурент") || lower.includes("market share")) {
-    return "You are a competitive intelligence analyst. Focus on competitive positioning, market dynamics, and strategic implications.";
-  }
-  if (lower.includes("product") || lower.includes("feature") || lower.includes("roadmap") || lower.includes("продукт")) {
-    return "You are a CPO-level product strategist. Focus on product opportunities, user needs, and prioritization.";
-  }
-  if (lower.includes("sales") || lower.includes("deal") || lower.includes("pipeline") || lower.includes("продажи")) {
-    return "You are a VP Sales analyst. Focus on deal analysis, win/loss patterns, and sales strategy.";
-  }
-  if (lower.includes("ops") || lower.includes("process") || lower.includes("efficiency") || lower.includes("процесс")) {
-    return "You are a COO-level operations analyst. Focus on operational efficiency, bottlenecks, and process improvements.";
-  }
-  
-  return "You are an expert business analyst. Provide clear, actionable insights based on the content.";
-}
-
 // Truncate to ~120k tokens (roughly 480k chars)
 function truncateContent(content: string, maxChars = 480000): string {
   if (content.length <= maxChars) return content;
@@ -99,13 +76,12 @@ export async function POST(request: Request) {
     }
 
     context = truncateContent(context);
-    const rolePrompt = detectRolePrompt(context);
 
-    const systemPrompt = `${rolePrompt}
-
-You are analyzing Notion documents. Preserve all markdown formatting in your response.
-Provide structured, actionable insights. Use headers, bullet points, and tables where appropriate.
-Be concise but thorough. Highlight key findings, risks, and recommendations.`;
+    // Simple, neutral system prompt (no role detection)
+    const systemPrompt = `You have access to the following Notion page content.
+Answer the user's question based on this context.
+If the content doesn't contain the answer, say so clearly.
+Preserve markdown formatting in your response when appropriate.`;
 
     const userPrompt = question 
       ? `${question}\n\n---\n\nDocument content:\n\n${context}`
