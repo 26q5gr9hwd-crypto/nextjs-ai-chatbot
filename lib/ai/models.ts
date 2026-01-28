@@ -1,356 +1,94 @@
-@import "tailwindcss";
-@import "katex/dist/katex.min.css";
+// Friends version - email-gated model access
+export const DEFAULT_CHAT_MODEL = "moonshot/kimi-k2-0905";
 
-/* include utility classes in streamdown */
-@source "../node_modules/streamdown/dist/index.js";
+// Allowed emails for premium models
+export const PREMIUM_EMAILS = [
+  "danieldj@mail.ru",
+  "getty.dan.14@gmail.com",
+];
 
-/* custom variant for setting dark mode programmatically */
-@custom-variant dark (&:is(.dark, .dark *));
+export type ChatModel = {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+};
 
-/* include plugins */
-@plugin "tailwindcss-animate";
-@plugin "@tailwindcss/typography";
+// Base models available to all users
+export const baseModels: ChatModel[] = [
+  // Google
+  {
+    id: "google/gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "google",
+    description: "Fast and capable Google model",
+  },
+  {
+    id: "google/gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "google",
+    description: "Most capable Google model",
+  },
+  // Moonshot (Kimi) - free for all
+  {
+    id: "moonshot/kimi-k2.5",
+    name: "Kimi K2.5",
+    provider: "moonshot",
+    description: "Latest Kimi model with enhanced capabilities",
+  },
+  {
+    id: "moonshot/kimi-k2-0905",
+    name: "Kimi K2",
+    provider: "moonshot",
+    description: "Kimi K2 model with strong reasoning",
+  },
+];
 
-/* define design tokens (light mode) */
-:root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(240 10% 3.9%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(240 10% 3.9%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(240 10% 3.9%);
-  --primary: hsl(240 5.9% 10%);
-  --primary-foreground: hsl(0 0% 98%);
-  --secondary: hsl(240 4.8% 95.9%);
-  --secondary-foreground: hsl(240 5.9% 10%);
-  --muted: hsl(240 4.8% 95.9%);
-  --muted-foreground: hsl(240 3.8% 46.1%);
-  --accent: hsl(240 4.8% 95.9%);
-  --accent-foreground: hsl(240 5.9% 10%);
-  --destructive: hsl(0 84.2% 60.2%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(240 5.9% 90%);
-  --input: hsl(240 5.9% 90%);
-  --ring: hsl(240 10% 3.9%);
-  --chart-1: hsl(12 76% 61%);
-  --chart-2: hsl(173 58% 39%);
-  --chart-3: hsl(197 37% 24%);
-  --chart-4: hsl(43 74% 66%);
-  --chart-5: hsl(27 87% 67%);
-  --sidebar-background: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
-  /* border radius unit */
-  --radius: 0.75rem;
-  /* accent color for personality */
-  --accent-primary: hsl(250 84% 62%);
-  --accent-primary-light: hsl(250 84% 72%);
-  --sidebar: hsl(0 0% 98%);
+// Premium models (only for allowed emails)
+export const premiumModels: ChatModel[] = [
+  // Anthropic - correct model IDs
+  {
+    id: "anthropic/claude-sonnet-4-5-20250929",
+    name: "Claude Sonnet 4.5",
+    provider: "anthropic",
+    description: "Best balance of speed, intelligence, and cost",
+  },
+  {
+    id: "anthropic/claude-haiku-4-5-20251001",
+    name: "Claude Haiku 4.5",
+    provider: "anthropic",
+    description: "Fast and affordable, great for everyday tasks",
+  },
+  // OpenAI
+  {
+    id: "openai/gpt-4o",
+    name: "GPT-4o",
+    provider: "openai",
+    description: "OpenAI's flagship multimodal model",
+  },
+];
+
+// Get models based on user email
+export function getChatModels(userEmail?: string): ChatModel[] {
+  const email = userEmail?.toLowerCase();
+  const isPremium = email && PREMIUM_EMAILS.includes(email);
+  
+  return isPremium ? [...baseModels, ...premiumModels] : baseModels;
 }
 
-/* define design tokens (dark mode) - Grok-inspired pitch black + subtle cyan-gray tint */
-.dark {
-  --background: hsl(200 5% 3%);
-  --foreground: hsl(200 5% 95%);
-  --card: hsl(200 5% 3%);
-  --card-foreground: hsl(200 5% 95%);
-  --popover: hsl(200 5% 6%);
-  --popover-foreground: hsl(200 5% 95%);
-  --primary: hsl(200 6% 20%);
-  --primary-foreground: hsl(200 5% 95%);
-  --secondary: hsl(200 5% 10%);
-  --secondary-foreground: hsl(200 5% 90%);
-  --muted: hsl(200 5% 10%);
-  --muted-foreground: hsl(200 5% 55%);
-  --accent: hsl(200 6% 14%);
-  --accent-foreground: hsl(200 5% 90%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(200 6% 18%);
-  --input: hsl(200 5% 10%);
-  --ring: hsl(200 6% 30%);
-  --chart-1: hsl(200 8% 50%);
-  --chart-2: hsl(200 8% 40%);
-  --chart-3: hsl(200 8% 30%);
-  --chart-4: hsl(200 8% 60%);
-  --chart-5: hsl(200 8% 45%);
-  --sidebar-background: hsl(200 5% 3%);
-  --sidebar-foreground: hsl(200 5% 75%);
-  --sidebar-primary: hsl(200 5% 95%);
-  --sidebar-primary-foreground: hsl(200 5% 3%);
-  --sidebar-accent: hsl(200 6% 14%);
-  --sidebar-accent-foreground: hsl(200 5% 95%);
-  --sidebar-border: hsl(200 6% 18%);
-  --sidebar-ring: hsl(200 6% 30%);
-  --sidebar: hsl(200 5% 3%);
-  /* accent color for personality - subtle cyan-gray */
-  --accent-primary: hsl(200 6% 20%);
-  --accent-primary-light: hsl(200 6% 28%);
-}
+// Legacy export for backwards compatibility
+export const chatModels = baseModels;
 
-/* define theme */
-@theme {
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-mono);
-
-  --breakpoint-toast-mobile: 600px;
-
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
-  --color-sidebar: var(--sidebar-background);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
-}
-
-@utility text-balance {
-  text-wrap: balance;
-}
-
-@utility -webkit-overflow-scrolling-touch {
-  -webkit-overflow-scrolling: touch;
-}
-
-@utility touch-pan-y {
-  touch-action: pan-y;
-}
-
-@utility overscroll-behavior-contain {
-  overscroll-behavior: contain;
-}
-
-@layer utilities {
-  :root {
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 214, 219, 220;
-    --background-end-rgb: 255, 255, 255;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --foreground-rgb: 255, 255, 255;
-      --background-start-rgb: 0, 0, 0;
-      --background-end-rgb: 0, 0, 0;
-    }
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    overflow-x: hidden;
-    position: relative;
-  }
-
-  html {
-    overflow-x: hidden;
-  }
-}
-
-.skeleton {
-  * {
-    pointer-events: none !important;
-  }
-
-  *[class^="text-"] {
-    color: transparent;
-    @apply rounded-md bg-foreground/20 select-none animate-pulse;
-  }
-
-  .skeleton-bg {
-    @apply bg-foreground/10;
-  }
-
-  .skeleton-div {
-    @apply bg-foreground/20 animate-pulse;
-  }
-}
-
-.ProseMirror {
-  outline: none;
-}
-
-.cm-editor,
-.cm-gutters {
-  @apply bg-background! dark:bg-zinc-800! outline-hidden! selection:bg-zinc-900!;
-}
-
-.ͼo.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
-.ͼo.cm-selectionBackground,
-.ͼo.cm-content::selection {
-  @apply bg-zinc-200! dark:bg-zinc-900!;
-}
-
-.cm-activeLine,
-.cm-activeLineGutter {
-  @apply bg-transparent!;
-}
-
-.cm-activeLine {
-  @apply rounded-r-sm!;
-}
-
-.cm-lineNumbers {
-  @apply min-w-7;
-}
-
-.cm-foldGutter {
-  @apply min-w-3;
-}
-
-.cm-lineNumbers .cm-activeLineGutter {
-  @apply rounded-l-sm!;
-}
-
-.suggestion-highlight {
-  @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/50 dark:text-blue-50 dark:bg-blue-500/40;
-}
-
-/* minimal scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-  transition: background 0.2s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: --alpha(var(--muted-foreground) / 0.5);
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* firefox scrollbar styling */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-@theme inline {
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-/* Smooth transitions for interactive elements */
-.transition-smooth {
-  @apply transition-all duration-200 ease-out;
-}
-
-/* Sidebar border separator */
-[data-sidebar="sidebar"],
-[data-slot="sidebar"],
-.sidebar {
-  border-right: 1px solid var(--sidebar-border) !important;
-}
-/* Sidebar item hover states */
-.sidebar-item {
-  @apply rounded-xl transition-all duration-150 ease-out;
-}
-.sidebar-item:hover {
-  @apply bg-sidebar-accent;
-}
-/* Smooth card styling */
-.card-smooth {
-  @apply rounded-2xl border border-border bg-card shadow-sm;
-}
-/* Message bubble styling */
-.message-bubble {
-  @apply rounded-2xl px-4 py-3;
-}
-.message-bubble-user {
-  @apply bg-primary text-primary-foreground rounded-br-md;
-}
-.message-bubble-assistant {
-  @apply bg-secondary text-secondary-foreground rounded-bl-md;
+// Group models by provider for UI
+export function getModelsByProvider(userEmail?: string) {
+  return getChatModels(userEmail).reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = [];
+      }
+      acc[model.provider].push(model);
+      return acc;
+    },
+    {} as Record<string, ChatModel[]>
+  );
 }
