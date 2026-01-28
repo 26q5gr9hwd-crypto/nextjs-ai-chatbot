@@ -57,6 +57,35 @@ function truncateContent(content: string, maxChars = 480000): string {
   return content.slice(0, maxChars) + "\n\n[Content truncated due to length...]";
 }
 
+// Write FULL response to page content as a callout
+async function appendResponseAsCallout(pageId: string, responseText: string) {
+  const chunkSize = 1900;
+  const chunks = [];
+  for (let i = 0; i < responseText.length; i += chunkSize) {
+    chunks.push(responseText.slice(i, i + chunkSize));
+  }
+
+  const richTextArray = chunks.map((chunk) => ({
+    type: "text" as const,
+    text: { content: chunk },
+  }));
+
+  await notion.blocks.children.append({
+    block_id: pageId,
+    children: [
+      {
+        object: "block" as const,
+        type: "callout" as const,
+        callout: {
+          icon: { type: "emoji", emoji: "🤖" },
+          color: "purple_background",
+          rich_text: richTextArray,
+        },
+      },
+    ],
+  });
+}
+
 export async function POST(request: Request) {
   try {
     // Auth check
@@ -149,7 +178,10 @@ If Notion page content is provided below, use it to answer the question.`;
 
     console.log("Kimi response length:", result.text.length);
 
-    // Write response back to Notion
+    // Write FULL response to page content as a callout
+    await appendResponseAsCallout(pageId, result.text);
+
+    // Update property with truncated preview + uncheck checkbox
     await notion.pages.update({
       page_id: pageId,
       properties: {
@@ -157,7 +189,12 @@ If Notion page content is provided below, use it to answer the question.`;
           rich_text: [
             {
               type: "text",
-              text: { content: result.text.slice(0, 2000) },
+              text: {
+                content:
+                  result.text.length > 1950
+                    ? result.text.slice(0, 1950) + "... [see page content]"
+                    : result.text,
+              },
             },
           ],
         },
@@ -167,6 +204,7 @@ If Notion page content is provided below, use it to answer the question.`;
 
     return Response.json({
       success: true,
+      responseLength: result.text.length,
       linkedPagesCount: linksText ? extractNotionUrls(linksText).length : 0,
     });
   } catch (error) {
