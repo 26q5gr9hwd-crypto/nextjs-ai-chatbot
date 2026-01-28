@@ -35,7 +35,7 @@ const moonshotBase = createOpenAICompatible({
 function wrapMoonshotModel<T extends { doGenerate: Function; doStream: Function }>(model: T): T {
   const filterEmptyAssistantMessages = (options: any) => {
     if (options.prompt) {
-      options.prompt = options.prompt.filter((msg) => {
+      options.prompt = options.prompt.filter((msg: any) => {
         if (msg.role === "assistant") {
           // Check if assistant message has actual content
           if (!msg.content || msg.content.length === 0) return false;
