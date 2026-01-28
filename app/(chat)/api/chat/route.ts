@@ -176,16 +176,16 @@ export async function POST(request: Request) {
           },
           // Capture message data as it streams for abort recovery
           onChunk: ({ chunk }) => {
-            if (chunk.type === "text-delta" && chunk.textDelta) {
+            if (chunk.type === "text-delta" && chunk.text) {
               // Accumulate text for potential abort save
               if (assistantMessageParts.length === 0) {
-                assistantMessageParts.push({ type: "text", text: chunk.textDelta });
+                assistantMessageParts.push({ type: "text", text: chunk.text });
               } else {
                 const lastPart = assistantMessageParts[assistantMessageParts.length - 1];
                 if (lastPart.type === "text") {
-                  lastPart.text += chunk.textDelta;
+                  lastPart.text += chunk.text;
                 } else {
-                  assistantMessageParts.push({ type: "text", text: chunk.textDelta });
+                  assistantMessageParts.push({ type: "text", text: chunk.text });
                 }
               }
             }
