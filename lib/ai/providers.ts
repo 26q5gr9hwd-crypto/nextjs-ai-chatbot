@@ -1,7 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+
 import {
   customProvider,
   extractReasoningMiddleware,
@@ -22,9 +22,8 @@ const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Moonshot/Kimi uses OpenAI-compatible API (chat.completions; NOT /responses)
-const moonshot = createOpenAICompatible({
-  name: "moonshot",
+// Moonshot/Kimi - fully OpenAI-compatible, use standard OpenAI provider with custom baseURL
+const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
 });
