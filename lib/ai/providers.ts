@@ -19,10 +19,10 @@ const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Moonshot/Kimi uses OpenAI-compatible API
 const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
+  compatibility: 'compatible',  // Forces /chat/completions
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
