@@ -327,6 +327,12 @@
   @apply transition-all duration-200 ease-out;
 }
 
+/* Sidebar border separator */
+[data-sidebar="sidebar"],
+[data-slot="sidebar"],
+.sidebar {
+  border-right: 1px solid var(--sidebar-border) !important;
+}
 /* Sidebar item hover states */
 .sidebar-item {
   @apply rounded-xl transition-all duration-150 ease-out;
