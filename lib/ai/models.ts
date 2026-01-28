@@ -1,99 +1,94 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import {
-  customProvider,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
-} from "ai";
-import { isTestEnvironment } from "../constants";
+// Friends version - email-gated model access
+export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash";
 
-// Direct provider instances (bypasses Vercel AI Gateway)
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Allowed emails for premium models
+export const PREMIUM_EMAILS = [
+  "danieldj@mail.ru",
+  "getty.dan.14@gmail.com",
+];
 
-// Moonshot/Kimi uses OpenAI-compatible API
-const moonshot = createOpenAI({
-  apiKey: process.env.MOONSHOT_API_KEY,
-  baseURL: "https://api.moonshot.ai/v1",
-});
+export type ChatModel = {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+};
 
-const THINKING_SUFFIX_REGEX = /-thinking$/;
+// Base models available to all users
+export const baseModels: ChatModel[] = [
+  // Google
+  {
+    id: "google/gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "google",
+    description: "Fast and capable Google model",
+  },
+  {
+    id: "google/gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "google",
+    description: "Most capable Google model",
+  },
+  // Moonshot (Kimi) - free for all
+  {
+    id: "moonshot/kimi-k2.5",
+    name: "Kimi K2.5",
+    provider: "moonshot",
+    description: "Latest Kimi model with enhanced capabilities",
+  },
+  {
+    id: "moonshot/kimi-k2-0905",
+    name: "Kimi K2",
+    provider: "moonshot",
+    description: "Kimi K2 model with strong reasoning",
+  },
+];
 
-export const myProvider = isTestEnvironment
-  ? (() => {
-      const {
-        artifactModel,
-        chatModel,
-        reasoningModel,
-        titleModel,
-      } = require("./models.mock");
-      return customProvider({
-        languageModels: {
-          "chat-model": chatModel,
-          "chat-model-reasoning": reasoningModel,
-          "title-model": titleModel,
-          "artifact-model": artifactModel,
-        },
-      });
-    })()
-  : null;
+// Premium models (only for allowed emails)
+export const premiumModels: ChatModel[] = [
+  // Anthropic - correct model IDs
+  {
+    id: "anthropic/claude-sonnet-4-5-20250929",
+    name: "Claude Sonnet 4.5",
+    provider: "anthropic",
+    description: "Best balance of speed, intelligence, and cost",
+  },
+  {
+    id: "anthropic/claude-haiku-4-5-20251001",
+    name: "Claude Haiku 4.5",
+    provider: "anthropic",
+    description: "Fast and affordable, great for everyday tasks",
+  },
+  // OpenAI
+  {
+    id: "openai/gpt-4o",
+    name: "GPT-4o",
+    provider: "openai",
+    description: "OpenAI's flagship multimodal model",
+  },
+];
 
-function getProviderModel(modelId: string) {
-  const [provider, ...modelParts] = modelId.split("/");
-  const model = modelParts.join("/");
-
-  switch (provider) {
-    case "google":
-      return google(model);
-    case "openai":
-      return openai(model);
-    case "anthropic":
-      return anthropic(model);
-    case "moonshot":
-      return moonshot.chat(model);  // Force /chat/completions endpoint
-    default:
-      throw new Error(`Unknown provider: ${provider}`);
-  }
+// Get models based on user email
+export function getChatModels(userEmail?: string): ChatModel[] {
+  const email = userEmail?.toLowerCase();
+  const isPremium = email && PREMIUM_EMAILS.includes(email);
+  
+  return isPremium ? [...baseModels, ...premiumModels] : baseModels;
 }
 
-export function getLanguageModel(modelId: string) {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel(modelId);
-  }
+// Legacy export for backwards compatibility
+export const chatModels = baseModels;
 
-  const isReasoningModel =
-    modelId.includes("reasoning") || modelId.endsWith("-thinking");
-
-  if (isReasoningModel) {
-    const cleanModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
-
-    return wrapLanguageModel({
-      model: getProviderModel(cleanModelId),
-      middleware: extractReasoningMiddleware({ tagName: "thinking" }),
-    });
-  }
-
-  return getProviderModel(modelId);
-}
-
-export function getTitleModel() {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel("title-model");
-  }
-  return google("gemini-2.5-flash");
-}
-
-export function getArtifactModel() {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel("artifact-model");
-  }
-  return openai("gpt-4o");
+// Group models by provider for UI
+export function getModelsByProvider(userEmail?: string) {
+  return getChatModels(userEmail).reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = [];
+      }
+      acc[model.provider].push(model);
+      return acc;
+    },
+    {} as Record<string, ChatModel[]>
+  );
 }
