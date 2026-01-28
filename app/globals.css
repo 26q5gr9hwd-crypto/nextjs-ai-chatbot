@@ -53,44 +53,44 @@
   --sidebar: hsl(0 0% 98%);
 }
 
-/* define design tokens (dark mode) */
+/* define design tokens (dark mode) - Grok-inspired pitch black + subtle cyan-gray tint */
 .dark {
-  --background: hsl(240 6% 6%);
-  --foreground: hsl(0 0% 98%);
-  --card: hsl(240 6% 8%);
-  --card-foreground: hsl(0 0% 98%);
-  --popover: hsl(240 6% 8%);
-  --popover-foreground: hsl(0 0% 98%);
-  --primary: hsl(250 84% 62%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(240 4% 14%);
-  --secondary-foreground: hsl(0 0% 98%);
-  --muted: hsl(240 4% 14%);
-  --muted-foreground: hsl(240 5% 58%);
-  --accent: hsl(250 50% 20%);
-  --accent-foreground: hsl(250 84% 80%);
+  --background: hsl(200 5% 3%);
+  --foreground: hsl(200 5% 95%);
+  --card: hsl(200 5% 3%);
+  --card-foreground: hsl(200 5% 95%);
+  --popover: hsl(200 5% 6%);
+  --popover-foreground: hsl(200 5% 95%);
+  --primary: hsl(200 6% 20%);
+  --primary-foreground: hsl(200 5% 95%);
+  --secondary: hsl(200 5% 10%);
+  --secondary-foreground: hsl(200 5% 90%);
+  --muted: hsl(200 5% 10%);
+  --muted-foreground: hsl(200 5% 55%);
+  --accent: hsl(200 6% 14%);
+  --accent-foreground: hsl(200 5% 90%);
   --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(240 4% 16%);
-  --input: hsl(240 4% 14%);
-  --ring: hsl(250 84% 62%);
-  --chart-1: hsl(220 70% 50%);
-  --chart-2: hsl(160 60% 45%);
-  --chart-3: hsl(30 80% 55%);
-  --chart-4: hsl(280 65% 60%);
-  --chart-5: hsl(340 75% 55%);
-  --sidebar-background: hsl(240 6% 8%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(250 84% 62%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(250 50% 16%);
-  --sidebar-accent-foreground: hsl(250 84% 85%);
-  --sidebar-border: hsl(240 4% 14%);
-  --sidebar-ring: hsl(250 84% 62%);
-  --sidebar: hsl(240 6% 8%);
-  /* accent color for personality */
-  --accent-primary: hsl(250 84% 62%);
-  --accent-primary-light: hsl(250 84% 72%);
+  --border: hsl(200 6% 18%);
+  --input: hsl(200 5% 10%);
+  --ring: hsl(200 6% 30%);
+  --chart-1: hsl(200 8% 50%);
+  --chart-2: hsl(200 8% 40%);
+  --chart-3: hsl(200 8% 30%);
+  --chart-4: hsl(200 8% 60%);
+  --chart-5: hsl(200 8% 45%);
+  --sidebar-background: hsl(200 5% 3%);
+  --sidebar-foreground: hsl(200 5% 75%);
+  --sidebar-primary: hsl(200 5% 95%);
+  --sidebar-primary-foreground: hsl(200 5% 3%);
+  --sidebar-accent: hsl(200 6% 14%);
+  --sidebar-accent-foreground: hsl(200 5% 95%);
+  --sidebar-border: hsl(200 6% 18%);
+  --sidebar-ring: hsl(200 6% 30%);
+  --sidebar: hsl(200 5% 3%);
+  /* accent color for personality - subtle cyan-gray */
+  --accent-primary: hsl(200 6% 20%);
+  --accent-primary-light: hsl(200 6% 28%);
 }
 
 /* define theme */
@@ -326,10 +326,7 @@
 .transition-smooth {
   @apply transition-all duration-200 ease-out;
 }
-/* Glow effect for focused inputs */
-.input-glow:focus-within {
-  box-shadow: 0 0 0 3px hsl(250 84% 62% / 0.15);
-}
+
 /* Sidebar item hover states */
 .sidebar-item {
   @apply rounded-xl transition-all duration-150 ease-out;
@@ -350,24 +347,4 @@
 }
 .message-bubble-assistant {
   @apply bg-secondary text-secondary-foreground rounded-bl-md;
-}
-/* iOS-like ("iOS 26") glass + depth utilities */
-.glass-surface {
-  @apply bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60;
-  @apply border border-border/60;
-}
-.glass-surface-strong {
-  @apply bg-card/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-card/70;
-  @apply border border-border/70;
-}
-.ios-shadow {
-  /* soft, layered shadow similar to iOS sheets */
-  box-shadow:
-    0 1px 0 0 hsl(0 0% 100% / 0.04) inset,
-    0 1px 1px hsl(240 10% 3.9% / 0.08),
-    0 10px 30px hsl(240 10% 3.9% / 0.18);
-}
-.ios-hairline {
-  /* 1px hairline that still feels crisp on dark */
-  box-shadow: 0 0 0 1px hsl(240 4% 16% / 0.7);
 }

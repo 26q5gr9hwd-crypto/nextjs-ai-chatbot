@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
   customProvider,
   extractReasoningMiddleware,
@@ -12,20 +13,24 @@ import { isTestEnvironment } from "../constants";
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
+
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Moonshot/Kimi uses OpenAI-compatible API
-const moonshot = createOpenAI({
+// Moonshot/Kimi uses OpenAI-compatible API (chat.completions; NOT /responses)
+const moonshot = createOpenAICompatible({
+  name: "moonshot",
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
+const NO_REASONING_SUFFIX_REGEX = /-no-reasoning$/;
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -69,10 +74,14 @@ export function getLanguageModel(modelId: string) {
     return myProvider.languageModel(modelId);
   }
 
-  const isReasoningModel =
-    modelId.includes("reasoning") || modelId.endsWith("-thinking");
+  // "Reasoning off" variant: no middleware, just strip suffix
+  if (modelId.endsWith("-no-reasoning")) {
+    const cleanModelId = modelId.replace(NO_REASONING_SUFFIX_REGEX, "");
+    return getProviderModel(cleanModelId);
+  }
 
-  if (isReasoningModel) {
+  // Reasoning variant: extract <thinking>...</thinking> if the model outputs it
+  if (modelId.endsWith("-thinking")) {
     const cleanModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
 
     return wrapLanguageModel({
