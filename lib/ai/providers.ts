@@ -19,13 +19,16 @@ const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Moonshot/Kimi uses OpenAI-compatible API
+// Moonshot/Kimi uses OpenAI-compatible API (chat.completions only)
 const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
+  // Force compatibility mode - use chat.completions, not responses API
+  compatibility: "compatible",
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
+const REASONING_SUFFIX_REGEX = /-reasoning$/;
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -69,11 +72,18 @@ export function getLanguageModel(modelId: string) {
     return myProvider.languageModel(modelId);
   }
 
+  // Check for reasoning models (both -thinking and -reasoning suffixes)
   const isReasoningModel =
-    modelId.includes("reasoning") || modelId.endsWith("-thinking");
+    modelId.includes("reasoning") || 
+    modelId.endsWith("-thinking") ||
+    modelId.endsWith("-thinking-turbo");
 
   if (isReasoningModel) {
-    const cleanModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
+    // Extract the base model ID by removing reasoning suffixes
+    const cleanModelId = modelId
+      .replace(/-reasoning$/, "")
+      .replace(/-thinking-turbo$/, "-thinking")  // keep -thinking for kimi-k2-thinking
+      .replace(/-thinking$/, "");
 
     return wrapLanguageModel({
       model: getProviderModel(cleanModelId),
