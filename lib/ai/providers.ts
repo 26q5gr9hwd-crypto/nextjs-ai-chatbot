@@ -23,9 +23,11 @@ const anthropic = createAnthropic({
 });
 
 // Moonshot/Kimi - fully OpenAI-compatible, use standard OpenAI provider with custom baseURL
+// compatibility: "compatible" forces chat/completions instead of /responses endpoint
 const moonshot = createOpenAI({
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
+  compatibility: "strict",
 });
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
