@@ -1,5 +1,5 @@
 // Friends version - email-gated model access
-export const DEFAULT_CHAT_MODEL = "moonshot/kimi-k2-0905";
+export const DEFAULT_CHAT_MODEL = "moonshot/kimi-k2.5";
 
 // Allowed emails for premium models
 export const PREMIUM_EMAILS = [
@@ -34,13 +34,19 @@ export const baseModels: ChatModel[] = [
     id: "moonshot/kimi-k2.5",
     name: "Kimi K2.5",
     provider: "moonshot",
-    description: "Latest Kimi model with enhanced capabilities",
+    description: "Latest Kimi model with reasoning (default)",
   },
   {
-    id: "moonshot/kimi-k2-0905",
-    name: "Kimi K2",
+    id: "moonshot/kimi-k2-0905-preview",
+    name: "Kimi K2 (Fast)",
     provider: "moonshot",
-    description: "Kimi K2 model with strong reasoning",
+    description: "Kimi K2 without reasoning - faster responses",
+  },
+  {
+    id: "moonshot/kimi-k2-thinking",
+    name: "Kimi K2 Thinking",
+    provider: "moonshot",
+    description: "Extended thinking for complex problems",
   },
 ];
 
