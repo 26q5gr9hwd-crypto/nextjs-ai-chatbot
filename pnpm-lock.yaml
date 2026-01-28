@@ -20,6 +20,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.21
         version: 3.0.21(zod@3.25.76)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.21
+        version: 2.0.21(zod@3.25.76)
       '@ai-sdk/provider':
         specifier: ^3.0.3
         version: 3.0.3
@@ -326,6 +329,12 @@ packages:
 
   '@ai-sdk/google@3.0.15':
     resolution: {integrity: sha512-sv12VNSBBXYRV35AUVUCzxLs0misPVcR0w6HZykBEwpmQ4oWJ/yj3OZfOh+78fwh8c4x6EIAjvQwgLgZMK+fFQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/openai-compatible@2.0.21':
+    resolution: {integrity: sha512-p8h1BgJl5r8sGqO26Ri61sy9/Ov8pzdwVkbOw8rrSBneXdKktH4aTlTMJ/1UPcn5fCv9TFH+OkG2M6uazjxzwg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -4134,6 +4143,12 @@ snapshots:
       zod: 3.25.76
 
   '@ai-sdk/google@3.0.15(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.5
+      '@ai-sdk/provider-utils': 4.0.10(zod@3.25.76)
+      zod: 3.25.76
+
+  '@ai-sdk/openai-compatible@2.0.21(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.5
       '@ai-sdk/provider-utils': 4.0.10(zod@3.25.76)
