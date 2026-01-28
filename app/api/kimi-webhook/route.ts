@@ -8,54 +8,50 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     
-    // Notion webhook sends page data
-    // The structure depends on how Notion formats the webhook payload
-    const pageId = payload.data?.id || payload.id;
+    // Log everything to debug
+    console.log("Full payload:", JSON.stringify(payload, null, 2));
     
-    // Extract Description from webhook payload
-    // Note: Notion webhook payloads include property values
-    const description = 
-      payload.data?.properties?.["Description "]?.rich_text?.[0]?.plain_text ||
-      payload.properties?.["Description "]?.rich_text?.[0]?.plain_text ||
-      "";
-
+    // Try multiple ways to get page ID
+    const pageId = payload.data?.id || payload.id || payload.page_id;
+    console.log("Extracted pageId:", pageId);
+    
     if (!pageId) {
-      return Response.json({ error: "No page ID in payload" }, { status: 400 });
+      return Response.json({ error: "No page ID", payload }, { status: 400 });
     }
-
+    
+    // Fetch the page directly from Notion
+    const page = await notion.pages.retrieve({ page_id: pageId }) as any;
+    const description = page.properties?.["Description "]?.rich_text?.[0]?.plain_text || "";
+    
+    console.log("Description:", description);
+    
     if (!description) {
-      return Response.json({ error: "No description provided" }, { status: 400 });
+      return Response.json({ error: "No description found" }, { status: 400 });
     }
-
+    
     // Call Kimi
     const result = await generateText({
       model: getLanguageModel("moonshot/kimi-k2.5"),
       prompt: description,
-      temperature: 1, // Required for Kimi reasoning models
+      temperature: 1,
     });
-
-    // Write response back to the same Notion page
+    
+    console.log("Kimi response length:", result.text.length);
+    
+    // Write response back to Notion
     await notion.pages.update({
       page_id: pageId,
       properties: {
         "Response": {
-          rich_text: [
-            {
-              type: "text",
-              text: { content: result.text.slice(0, 2000) } // Notion rich_text limit
-            }
-          ]
+          rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }]
         },
-        "Checkbox": { checkbox: false } // Uncheck to reset for next query
+        "Checkbox": { checkbox: false }
       }
     });
-
-    return Response.json({ success: true, responseLength: result.text.length });
+    
+    return Response.json({ success: true });
   } catch (error) {
     console.error("kimi-webhook error:", error);
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Webhook failed" },
-      { status: 500 }
-    );
+    return Response.json({ error: String(error) }, { status: 500 });
   }
 }
