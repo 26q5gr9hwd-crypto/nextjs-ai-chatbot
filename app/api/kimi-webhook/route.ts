@@ -57,12 +57,10 @@ function truncateContent(content: string, maxChars = 480000): string {
   return content.slice(0, maxChars) + "\n\n[Content truncated due to length...]";
 }
 
-// Append response as a callout to a page
+// Append response as a callout to a page (FIXED: no generic string params)
 async function appendResponseAsCallout(
   pageId: string,
-  responseText: string,
-  icon: string = "🤖",
-  color: string = "purple_background"
+  responseText: string
 ) {
   const chunkSize = 1900;
   const chunks: string[] = [];
@@ -84,11 +82,11 @@ async function appendResponseAsCallout(
         object: "block" as const,
         type: "callout" as const,
         callout: {
-          icon: { type: "emoji", emoji: icon },
-          color: color,
+          icon: { type: "emoji" as const, emoji: "🤖" },
+          color: "purple_background" as const,
           rich_text: richTextArray,
         },
-      },
+      } as any, // Type assertion to bypass strict EmojiRequest typing
     ],
   });
 }
@@ -195,16 +193,16 @@ If Notion page content is provided below, use it to answer the question.`;
       // Write to the Source page (the chat where Kimi was requested)
       const sourcePageId = extractPageId(sourceUrl);
       if (sourcePageId) {
-        await appendResponseAsCallout(sourcePageId, result.text, "🤖", "purple_background");
+        await appendResponseAsCallout(sourcePageId, result.text);
         console.log("Response written to Source page:", sourcePageId);
       } else {
         // Fallback: write to Kimi DB entry if Source URL is invalid
-        await appendResponseAsCallout(pageId, result.text, "🤖", "purple_background");
+        await appendResponseAsCallout(pageId, result.text);
         console.log("Response written to Kimi DB entry (Source URL invalid)");
       }
     } else {
       // Fallback: write to Kimi DB entry if no Source
-      await appendResponseAsCallout(pageId, result.text, "🤖", "purple_background");
+      await appendResponseAsCallout(pageId, result.text);
       console.log("Response written to Kimi DB entry (no Source)");
     }
 
