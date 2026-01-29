@@ -57,12 +57,19 @@ function truncateContent(content: string, maxChars = 480000): string {
   return content.slice(0, maxChars) + "\n\n[Content truncated due to length...]";
 }
 
-// Write FULL response to page content as a callout
-async function appendResponseAsCallout(pageId: string, responseText: string) {
+// Append response as a callout to a page
+async function appendResponseAsCallout(
+  pageId: string,
+  responseText: string,
+  icon: string = "🤖",
+  color: string = "purple_background"
+) {
   const chunkSize = 1900;
-  const chunks = [];
-  for (let i = 0; i < responseText.length; i += chunkSize) {
-    chunks.push(responseText.slice(i, i + chunkSize));
+  const chunks: string[] = [];
+  // Add "Kimi:" prefix to the response
+  const formattedResponse = `**Kimi:** ${responseText}`;
+  for (let i = 0; i < formattedResponse.length; i += chunkSize) {
+    chunks.push(formattedResponse.slice(i, i + chunkSize));
   }
 
   const richTextArray = chunks.map((chunk) => ({
@@ -77,8 +84,8 @@ async function appendResponseAsCallout(pageId: string, responseText: string) {
         object: "block" as const,
         type: "callout" as const,
         callout: {
-          icon: { type: "emoji", emoji: "🤖" },
-          color: "purple_background",
+          icon: { type: "emoji", emoji: icon },
+          color: color,
           rich_text: richTextArray,
         },
       },
@@ -111,12 +118,16 @@ export async function POST(request: Request) {
       page.properties?.["Description "]?.rich_text?.[0]?.plain_text || "";
     const linksText =
       page.properties?.["Links"]?.rich_text?.[0]?.plain_text || "";
+    const sourceUrl =
+      page.properties?.["Source"]?.url ||
+      page.properties?.["Source"]?.rich_text?.[0]?.plain_text || "";
 
     console.log("Description:", description);
     console.log("Links:", linksText);
+    console.log("Source:", sourceUrl);
 
-    if (!description) {
-      return Response.json({ error: "No description found" }, { status: 400 });
+    if (!description && !linksText) {
+      return Response.json({ error: "No description or links found" }, { status: 400 });
     }
 
     // Build context from linked pages
@@ -150,7 +161,8 @@ export async function POST(request: Request) {
     const fullContext = truncateContent(description + linkedPagesContent);
 
     // Neutral system prompt (prevents CFO/role auto-detection)
-    const systemPrompt = `You are a helpful assistant.
+    const systemPrompt = `You are a helpful assistant. Answer the user's question directly and concisely.
+Do not roleplay as a business executive (CFO, CTO, etc.) unless explicitly asked.
 Do not make assumptions about lacking API access — you have all the context you need in the prompt.
 If Notion page content is provided below, use it to answer the question.`;
 
@@ -178,34 +190,36 @@ If Notion page content is provided below, use it to answer the question.`;
 
     console.log("Kimi response length:", result.text.length);
 
-    // Write FULL response to page content as a callout
-    await appendResponseAsCallout(pageId, result.text);
+    // Determine where to write the response
+    if (sourceUrl) {
+      // Write to the Source page (the chat where Kimi was requested)
+      const sourcePageId = extractPageId(sourceUrl);
+      if (sourcePageId) {
+        await appendResponseAsCallout(sourcePageId, result.text, "🤖", "purple_background");
+        console.log("Response written to Source page:", sourcePageId);
+      } else {
+        // Fallback: write to Kimi DB entry if Source URL is invalid
+        await appendResponseAsCallout(pageId, result.text, "🤖", "purple_background");
+        console.log("Response written to Kimi DB entry (Source URL invalid)");
+      }
+    } else {
+      // Fallback: write to Kimi DB entry if no Source
+      await appendResponseAsCallout(pageId, result.text, "🤖", "purple_background");
+      console.log("Response written to Kimi DB entry (no Source)");
+    }
 
-    // Update property with truncated preview + uncheck checkbox
+    // Uncheck the Checkbox
     await notion.pages.update({
       page_id: pageId,
       properties: {
-        Response: {
-          rich_text: [
-            {
-              type: "text",
-              text: {
-                content:
-                  result.text.length > 1950
-                    ? result.text.slice(0, 1950) + "... [see page content]"
-                    : result.text,
-              },
-            },
-          ],
-        },
         Checkbox: { checkbox: false },
       },
     });
 
     return Response.json({
       success: true,
-      responseLength: result.text.length,
       linkedPagesCount: linksText ? extractNotionUrls(linksText).length : 0,
+      deliveredTo: sourceUrl ? "source" : "kimi-db",
     });
   } catch (error) {
     console.error("kimi-webhook error:", error);
