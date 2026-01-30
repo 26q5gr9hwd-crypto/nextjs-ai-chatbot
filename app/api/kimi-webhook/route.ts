@@ -10,6 +10,36 @@ const n2m = new NotionToMarkdown({ notionClient: notion });
 // Webhook secret — move to env var in production
 const WEBHOOK_SECRET = process.env.KIMI_WEBHOOK_SECRET || "Hjdnjajndjsnanjn893dafdafwe";
 
+// Kimi System Prompt page ID — cached at module level
+const KIMI_SYSTEM_PROMPT_PAGE_ID = process.env.KIMI_SYSTEM_PROMPT_PAGE_ID || "";
+let cachedSystemContext: string | null = null;
+let systemContextLastFetch = 0;
+const SYSTEM_CONTEXT_CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
+
+// Fetch and cache the Kimi System Prompt page
+async function getKimiSystemContext(): Promise<string> {
+  const now = Date.now();
+  if (cachedSystemContext && now - systemContextLastFetch < SYSTEM_CONTEXT_CACHE_TTL) {
+    return cachedSystemContext;
+  }
+  try {
+    const pageId = KIMI_SYSTEM_PROMPT_PAGE_ID;
+    if (!pageId) {
+      console.warn("KIMI_SYSTEM_PROMPT_PAGE_ID not configured");
+      return "";
+    }
+    const mdBlocks = await n2m.pageToMarkdown(pageId);
+    const content = n2m.toMarkdownString(mdBlocks).parent;
+    cachedSystemContext = content;
+    systemContextLastFetch = now;
+    console.log(`Kimi System Prompt cached (${content.length} chars)`);
+    return content;
+  } catch (error) {
+    console.warn("Failed to fetch Kimi System Prompt:", error);
+    return cachedSystemContext || "";
+  }
+}
+
 function getHeader(req: Request, name: string) {
   return req.headers.get(name) ?? req.headers.get(name.toLowerCase());
 }
@@ -31,11 +61,9 @@ function extractPageIdsFromRichText(richTextArray: any[]): string[] {
   if (!Array.isArray(richTextArray)) return pageIds;
 
   for (const block of richTextArray) {
-    // Handle mention type (page mentions)
     if (block.type === "mention" && block.mention?.page?.id) {
       pageIds.push(block.mention.page.id);
     }
-    // Fallback: check plain_text for raw URLs
     if (block.plain_text) {
       const urlMatch = block.plain_text.match(
         /https:\/\/(?:www\.)?notion\.so\/[^\s)"'<>]+/gi
@@ -83,7 +111,6 @@ function safeMarkdownToBlocks(markdown: string): any[] {
   try {
     const blocks = markdownToBlocks(markdown);
     if (!blocks || blocks.length === 0) {
-      // Fallback: split into paragraphs
       return markdown.split("\n\n").filter(Boolean).map((chunk) => ({
         type: "paragraph",
         paragraph: {
@@ -94,7 +121,6 @@ function safeMarkdownToBlocks(markdown: string): any[] {
     return blocks;
   } catch (e) {
     console.error("martian conversion failed:", e);
-    // Fallback: split into paragraphs
     return markdown.split("\n\n").filter(Boolean).map((chunk) => ({
       type: "paragraph",
       paragraph: {
@@ -111,7 +137,6 @@ async function appendResponseAsCallout(
   icon: string = "🦋",
   color: "purple_background" | "blue_background" | "gray_background" = "purple_background"
 ) {
-  // Step 1: Create the callout block with header
   const calloutResponse = await notion.blocks.children.append({
     block_id: pageId,
     children: [
@@ -133,9 +158,8 @@ async function appendResponseAsCallout(
     return;
   }
 
-  // Step 2: Convert markdown to Notion blocks and append as children
   const blocks = safeMarkdownToBlocks(responseText);
-  const BATCH_SIZE = 100; // Notion API limit
+  const BATCH_SIZE = 100;
 
   for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
     const batch = blocks.slice(i, i + BATCH_SIZE);
@@ -146,23 +170,29 @@ async function appendResponseAsCallout(
   }
 }
 
-// Update Kimi DB page with status and optional error
+// Update Kimi DB page with status and optional error (MODULE LEVEL)
 async function updateKimiStatus(
   pageId: string,
   status: "Processing" | "Responded" | "Error",
   error?: string
 ) {
   const properties: any = {
-    Checkbox: { checkbox: false },
+    Status: { select: { name: status } },
   };
-
-  // Note: Add Status and Error properties to Call Kimi DB for these to work
-  // Status: select (Queued, Processing, Responded, Error)
-  // Error: text
-  // For now, these will silently fail if properties don't exist
-
+  if (status === "Responded" || status === "Error") {
+    properties.Checkbox = { checkbox: false };
+  }
+  if (error) {
+    properties.Error = {
+      rich_text: [{ type: "text", text: { content: error.slice(0, 2000) } }],
+    };
+  }
+  if (status === "Responded") {
+    properties.Error = { rich_text: [] };
+  }
   try {
     await notion.pages.update({ page_id: pageId, properties });
+    console.log(`Kimi status updated to: ${status}`);
   } catch (e) {
     console.warn("Failed to update Kimi status:", e);
   }
@@ -188,6 +218,9 @@ export async function POST(request: Request) {
     if (!pageId) {
       return Response.json({ error: "No page ID", payload }, { status: 400 });
     }
+
+    // Mark as Processing
+    await updateKimiStatus(pageId, "Processing");
 
     // Fetch the Kimi DB page with full properties
     const page = (await notion.pages.retrieve({ page_id: pageId })) as any;
@@ -225,31 +258,31 @@ export async function POST(request: Request) {
 
     console.log(`Fetched ${fetchedPages.length} linked pages`);
 
-// NEW: First linked page = PROMPT PAGE (primary instructions)
-// Remaining pages = supporting context
-let primaryPrompt = description; // Fallback if no prompt page
-let contextSection = "";
+    // First linked page = PROMPT PAGE (primary instructions)
+    // Remaining pages = supporting context
+    let primaryPrompt = description;
+    let contextSection = "";
 
-if (fetchedPages.length > 0) {
-  // First linked page is the prompt page with Question/Task, Instructions
-  primaryPrompt = fetchedPages[0].content;
-  
-  // Remaining pages are supporting context (code, specs)
-  const contextPages = fetchedPages.slice(1);
-  if (contextPages.length > 0) {
-    contextSection = "\n\n---\n\n## Supporting Context\n\n";
-    for (const p of contextPages) {
-      contextSection += `### ${p.title}\n\n${p.content}\n\n`;
+    if (fetchedPages.length > 0) {
+      primaryPrompt = fetchedPages[0].content;
+
+      const contextPages = fetchedPages.slice(1);
+      if (contextPages.length > 0) {
+        contextSection = "\n\n---\n\n## Supporting Context\n\n";
+        for (const p of contextPages) {
+          contextSection += `### ${p.title}\n\n${p.content}\n\n`;
+        }
+      }
     }
-  }
-}
 
-// Build full prompt: instructions first, then context
-const fullContext = truncateContent(primaryPrompt + contextSection);
+    const fullContext = truncateContent(primaryPrompt + contextSection);
     console.log(`Full context length: ${fullContext.length} chars`);
 
-    // Notion-aware system prompt
+    // Fetch cached Kimi System Prompt
+    const kimiSystemContext = await getKimiSystemContext();
+
     const systemPrompt = `You are Kimi, an AI assistant answering questions for a Notion workspace.
+You have web search capability. When asked about current events, prices, documentation, or information that may have changed since your training, use web search to get up-to-date information.
 Your response will be converted to Notion blocks via markdown, so:
 - Use ## and ### headers to organize sections (not #)
 - Use bullet lists (-) and numbered lists (1.)
@@ -257,16 +290,21 @@ Your response will be converted to Notion blocks via markdown, so:
 - Use **bold** for emphasis, tables where helpful
 - Keep paragraphs concise — they render as individual blocks
 The user's question and instructions are provided below. Follow any specific output format or focus areas they request.
-Be direct, thorough, and actionable. Do not hedge or claim lack of access — all relevant context is provided.`;
+Be direct, thorough, and actionable. Do not hedge or claim lack of access — all relevant context is provided.
+---
+## Workspace Context (from Kimi System Prompt page)
+${kimiSystemContext}`;
 
-    // Call Kimi — no thinking:disabled, let it reason
+    // Call Kimi with web search enabled
     let result;
     try {
       result = await generateText({
         model: getLanguageModel("moonshot/kimi-k2.5"),
         system: systemPrompt,
         prompt: fullContext,
-        // No providerOptions — let Kimi think
+        providerOptions: {
+          moonshot: { search: true },
+        },
       });
     } catch (error) {
       console.warn("kimi-k2.5 failed, falling back to kimi-k2-thinking:", error);
@@ -274,6 +312,9 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
         model: getLanguageModel("moonshot/kimi-k2-thinking"),
         system: systemPrompt,
         prompt: fullContext,
+        providerOptions: {
+          moonshot: { search: true },
+        },
       });
     }
 
@@ -284,6 +325,9 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
     await appendResponseAsCallout(targetPageId, result.text, "🦋", "purple_background");
     console.log(`Response written to: ${sourcePageId ? "Source page" : "Kimi DB entry"} (${targetPageId})`);
 
+    // Update status to Responded and store response
+    await updateKimiStatus(pageId, "Responded");
+
     // Also store in Response property as backup
     try {
       await notion.pages.update({
@@ -292,7 +336,6 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
           Response: {
             rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }],
           },
-          Checkbox: { checkbox: false },
           Delivered: { checkbox: true },
         },
       });
@@ -311,21 +354,8 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
   } catch (error) {
     console.error("kimi-webhook error:", error);
 
-    // Try to mark as error if we have pageId
     if (pageId) {
-      try {
-        await notion.pages.update({
-          page_id: pageId,
-          properties: {
-            Checkbox: { checkbox: false },
-            Response: {
-              rich_text: [{ type: "text", text: { content: `Error: ${String(error).slice(0, 1900)}` } }],
-            },
-          },
-        });
-      } catch (e) {
-        console.warn("Failed to write error to Kimi DB:", e);
-      }
+      await updateKimiStatus(pageId, "Error", String(error));
     }
 
     return Response.json({ error: String(error) }, { status: 500 });
