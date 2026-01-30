@@ -214,7 +214,6 @@ export async function POST(request: Request) {
     }
 
     // Build context from linked pages (increased to 10)
-    let linkedPagesContent = "";
     const fetchedPages: { title: string; content: string }[] = [];
 
     for (const pid of linkedPageIds.slice(0, 10)) {
@@ -224,25 +223,41 @@ export async function POST(request: Request) {
       }
     }
 
-    if (fetchedPages.length > 0) {
-      linkedPagesContent = "\n\n---\n\n## Linked Notion Pages\n\n";
-      for (const p of fetchedPages) {
-        linkedPagesContent += `### ${p.title}\n\n${p.content}\n\n`;
-      }
-    }
-
     console.log(`Fetched ${fetchedPages.length} linked pages`);
 
-    // Build the full prompt
-    const fullContext = truncateContent(description + linkedPagesContent);
+// NEW: First linked page = PROMPT PAGE (primary instructions)
+// Remaining pages = supporting context
+let primaryPrompt = description; // Fallback if no prompt page
+let contextSection = "";
+
+if (fetchedPages.length > 0) {
+  // First linked page is the prompt page with Question/Task, Instructions
+  primaryPrompt = fetchedPages[0].content;
+  
+  // Remaining pages are supporting context (code, specs)
+  const contextPages = fetchedPages.slice(1);
+  if (contextPages.length > 0) {
+    contextSection = "\n\n---\n\n## Supporting Context\n\n";
+    for (const p of contextPages) {
+      contextSection += `### ${p.title}\n\n${p.content}\n\n`;
+    }
+  }
+}
+
+// Build full prompt: instructions first, then context
+const fullContext = truncateContent(primaryPrompt + contextSection);
     console.log(`Full context length: ${fullContext.length} chars`);
 
-    // Neutral system prompt
-    const systemPrompt = `You are Kimi, a helpful AI assistant with a large context window. 
-Answer the user's question based on the provided context.
-Do not claim you lack access to information — the full context is provided below.
-Be direct, thorough, and actionable.
-Use markdown formatting for clarity (headings, lists, code blocks, tables).`;
+    // Notion-aware system prompt
+    const systemPrompt = `You are Kimi, an AI assistant answering questions for a Notion workspace.
+Your response will be converted to Notion blocks via markdown, so:
+- Use ## and ### headers to organize sections (not #)
+- Use bullet lists (-) and numbered lists (1.)
+- Use \`\`\`language code blocks with syntax highlighting
+- Use **bold** for emphasis, tables where helpful
+- Keep paragraphs concise — they render as individual blocks
+The user's question and instructions are provided below. Follow any specific output format or focus areas they request.
+Be direct, thorough, and actionable. Do not hedge or claim lack of access — all relevant context is provided.`;
 
     // Call Kimi — no thinking:disabled, let it reason
     let result;
