@@ -109,7 +109,7 @@ async function appendResponseAsCallout(
   pageId: string,
   responseText: string,
   icon: string = "🦋",
-  color: string = "purple_background"
+  color: "purple_background" | "blue_background" | "gray_background" = "purple_background"
 ) {
   // Step 1: Create the callout block with header
   const calloutResponse = await notion.blocks.children.append({
@@ -119,8 +119,8 @@ async function appendResponseAsCallout(
         object: "block" as const,
         type: "callout" as const,
         callout: {
-          icon: { type: "emoji", emoji: icon },
-          color: color,
+          icon: { type: "emoji" as const, emoji: icon as any },
+          color: color as any,
           rich_text: [{ type: "text", text: { content: "Kimi:" } }],
         },
       },
