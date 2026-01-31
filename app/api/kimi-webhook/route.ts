@@ -321,10 +321,10 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
             "Kimi Response": {
               rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }],
             },
-            "Supervisor Trigger": { checkbox: true },
+            // Supervisor Trigger handled by Notion automation on Kimi Response update
           },
         });
-        console.log(`Agent Task ${agentTaskId} updated with Kimi Response + Supervisor Trigger`);
+        console.log(`Agent Task ${agentTaskId} updated with Kimi Response`);
       } catch (e) {
         console.warn("Failed to update Agent Task:", e);
       }
