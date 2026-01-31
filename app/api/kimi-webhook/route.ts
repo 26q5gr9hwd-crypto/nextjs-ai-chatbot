@@ -115,7 +115,7 @@ async function appendResponseAsCallout(
         callout: {
           icon: { type: "emoji" as const, emoji: icon as any },
           color: color as any,
-          rich_text: [], // No "Kimi:" prefix — icon is enough
+          rich_text: [],
         },
       },
     ],
@@ -139,36 +139,70 @@ async function appendResponseAsCallout(
   }
 }
 
-// Update Kimi DB page with status and optional error
-async function updateKimiStatus(
-  pageId: string,
-  status: "Processing" | "Responded" | "Error",
-  error?: string
+// Update Agent Task status and trigger Supervisor
+async function updateTaskStatus(
+  taskId: string,
+  status: "Working" | "Done" | "Error",
+  options: {
+    kimiResponse?: string;
+    errorLog?: string;
+    triggerSupervisor?: boolean;
+  } = {}
 ) {
   const properties: any = {
-    Status: { select: { name: status } },
+    Status: { status: { name: status } },
   };
-  if (status === "Responded" || status === "Error") {
-    properties.Checkbox = { checkbox: false };
-  }
-  if (error) {
-    properties.Error = {
-      rich_text: [{ type: "text", text: { content: error.slice(0, 2000) } }],
+
+  if (status === "Working") {
+    properties["Started At"] = {
+      date: { start: new Date().toISOString() },
     };
   }
-  if (status === "Responded") {
-    properties.Error = { rich_text: [] };
+
+  if (status === "Done") {
+    properties["Completed At"] = {
+      date: { start: new Date().toISOString() },
+    };
   }
+
+  if (options.kimiResponse) {
+    properties["Kimi Response"] = {
+      rich_text: [{ type: "text", text: { content: options.kimiResponse.slice(0, 2000) } }],
+    };
+  }
+
+  if (options.errorLog) {
+    properties["Error Log"] = {
+      rich_text: [{ type: "text", text: { content: options.errorLog.slice(0, 2000) } }],
+    };
+  }
+
+  if (options.triggerSupervisor) {
+    properties["Supervisor Trigger"] = { checkbox: true };
+  }
+
   try {
-    await notion.pages.update({ page_id: pageId, properties });
-    console.log(`Kimi status updated to: ${status}`);
+    await notion.pages.update({ page_id: taskId, properties });
+    console.log(`Task ${taskId} updated: Status=${status}, SupervisorTrigger=${options.triggerSupervisor}`);
   } catch (e) {
-    console.warn("Failed to update Kimi status:", e);
+    console.warn("Failed to update task status:", e);
+  }
+}
+
+// Check if task has a parent (subtask pattern)
+async function getParentTaskId(taskId: string): Promise<string | null> {
+  try {
+    const page = (await notion.pages.retrieve({ page_id: taskId })) as any;
+    const parentRelation = page.properties?.["Parent Task"]?.relation || [];
+    return parentRelation[0]?.id || null;
+  } catch (e) {
+    console.warn("Failed to get parent task:", e);
+    return null;
   }
 }
 
 export async function POST(request: Request) {
-  let pageId: string | null = null;
+  let taskId: string | null = null;
 
   try {
     // Auth check
@@ -180,80 +214,73 @@ export async function POST(request: Request) {
     const payload = await request.json();
     console.log("Full payload:", JSON.stringify(payload, null, 2));
 
-    // Get page ID
-    pageId = payload.data?.id || payload.id || payload.page_id;
-    console.log("Extracted pageId:", pageId);
+    // Get task ID from Agent Tasks
+    taskId = payload.data?.id || payload.id || payload.page_id;
+    console.log("Extracted taskId:", taskId);
 
-    if (!pageId) {
-      return Response.json({ error: "No page ID", payload }, { status: 400 });
+    if (!taskId) {
+      return Response.json({ error: "No task ID", payload }, { status: 400 });
     }
 
-    // Mark as Processing
-    await updateKimiStatus(pageId, "Processing");
+    // Mark as Working
+    await updateTaskStatus(taskId, "Working");
 
-    // Fetch the Kimi DB page with full properties
-    const page = (await notion.pages.retrieve({ page_id: pageId })) as any;
+    // Fetch the Agent Task page
+    const task = (await notion.pages.retrieve({ page_id: taskId })) as any;
 
-    // Extract Description
-    const descriptionRichText = page.properties?.["Description"]?.rich_text || [];
-    const description = descriptionRichText.map((rt: any) => rt.plain_text).join("");
+    // Verify this is a Kimi task
+    const agent = task.properties?.["Agent"]?.select?.name;
+    if (agent !== "Kimi") {
+      console.log(`Task is not for Kimi (Agent=${agent}), skipping`);
+      return Response.json({ skipped: true, reason: "Not a Kimi task" });
+    }
 
-    // Extract Links — parse mentions from rich_text
-    const linksRichText = page.properties?.["Links"]?.rich_text || [];
-    const linkedPageIds = extractPageIdsFromRichText(linksRichText);
+    // Extract task properties
+    const taskName = task.properties?.["Name"]?.title?.[0]?.plain_text || "Untitled Task";
+    const callKimi = task.properties?.["Call Kimi"]?.rich_text?.map((rt: any) => rt.plain_text).join("") || "";
+    const context = task.properties?.["Context"]?.rich_text?.map((rt: any) => rt.plain_text).join("") || "";
+    const outputLocation = task.properties?.["Output Location"]?.select?.name || "Task Page";
 
-    // Extract Source — parse mention from rich_text
-    const sourceRichText = page.properties?.["Source"]?.rich_text || [];
-    const sourcePageIds = extractPageIdsFromRichText(sourceRichText);
-    const sourcePageId = sourcePageIds[0] || null;
+    // Extract linked pages from Context (mentions)
+    const contextRichText = task.properties?.["Context"]?.rich_text || [];
+    const linkedPageIds = extractPageIdsFromRichText(contextRichText);
 
-    // Extract Agent Task relation (for agent → Kimi → Supervisor callback)
-    const agentTaskRelation = page.properties?.["Agent Task"]?.relation || [];
-    const agentTaskId = agentTaskRelation[0]?.id || null;
-
-    console.log("Description:", description.slice(0, 200));
+    console.log("Task Name:", taskName);
+    console.log("Call Kimi:", callKimi.slice(0, 200));
+    console.log("Context:", context.slice(0, 200));
+    console.log("Output Location:", outputLocation);
     console.log("Linked page IDs:", linkedPageIds);
-    console.log("Source page ID:", sourcePageId);
-    console.log("Agent Task ID:", agentTaskId);
 
-    if (!description && linkedPageIds.length === 0) {
-      return Response.json({ error: "No description or links found" }, { status: 400 });
+    if (!callKimi && !context) {
+      await updateTaskStatus(taskId, "Error", { errorLog: "No Call Kimi or Context provided" });
+      return Response.json({ error: "No Call Kimi or Context provided" }, { status: 400 });
     }
 
     // Build context from linked pages (up to 10)
     const fetchedPages: { title: string; content: string }[] = [];
-
     for (const pid of linkedPageIds.slice(0, 10)) {
       const pageData = await fetchNotionPage(pid);
       if (pageData) {
         fetchedPages.push(pageData);
       }
     }
-
     console.log(`Fetched ${fetchedPages.length} linked pages`);
 
-    // First linked page = PROMPT PAGE (primary instructions)
-    // Remaining pages = supporting context
-    let primaryPrompt = description;
-    let contextSection = "";
-
+    // Build the prompt
+    let prompt = callKimi || context;
+    
     if (fetchedPages.length > 0) {
-      primaryPrompt = fetchedPages[0].content;
-
-      const contextPages = fetchedPages.slice(1);
-      if (contextPages.length > 0) {
-        contextSection = "\n\n---\n\n## Supporting Context\n\n";
-        for (const p of contextPages) {
-          contextSection += `### ${p.title}\n\n${p.content}\n\n`;
-        }
+      prompt += "\n\n---\n\n## Context Pages\n\n";
+      for (const p of fetchedPages) {
+        prompt += `### ${p.title}\n\n${p.content}\n\n`;
       }
     }
 
-    const fullContext = truncateContent(primaryPrompt + contextSection);
+    const fullContext = truncateContent(prompt);
     console.log(`Full context length: ${fullContext.length} chars`);
 
-    // System prompt (Router now handles workspace context on first message)
-    const systemPrompt = `You are Kimi, an AI assistant answering questions for a Notion workspace.
+    // System prompt
+    const systemPrompt = `You are Kimi, an AI assistant working as part of an agent team.
 You have web search capability. When asked about current events, prices, documentation, or information that may have changed since your training, use web search to get up-to-date information.
 Your response will be converted to Notion blocks via markdown, so:
 - Use ## and ### headers to organize sections (not #)
@@ -289,61 +316,53 @@ Be direct, thorough, and actionable. Do not hedge or claim lack of access — al
 
     console.log("Kimi response length:", result.text.length);
 
-    // Determine where to write the response
-    const targetPageId = sourcePageId || pageId;
-    await appendResponseAsCallout(targetPageId, result.text, "🦋", "purple_background");
-    console.log(`Response written to: ${sourcePageId ? "Source page" : "Kimi DB entry"} (${targetPageId})`);
-
-    // Update status to Responded
-    await updateKimiStatus(pageId, "Responded");
-
-    // Store response in Response property as backup
-    try {
-      await notion.pages.update({
-        page_id: pageId,
-        properties: {
-          Response: {
-            rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }],
-          },
-          Delivered: { checkbox: true },
-        },
-      });
-    } catch (e) {
-      console.warn("Failed to update Response property:", e);
+    // Write response based on Output Location
+    if (outputLocation === "Task Page" || outputLocation === "Both") {
+      await appendResponseAsCallout(taskId, result.text, "🦋", "purple_background");
+      console.log("Response written to Task Page");
     }
 
-    // If Agent Task linked, write to Kimi Response and trigger Supervisor
-    if (agentTaskId) {
+    // Check if parent task exists (for Supervisor trigger)
+    const parentTaskId = await getParentTaskId(taskId);
+    const shouldTriggerSupervisor = !!parentTaskId;
+
+    // Update task: Status = Done, Kimi Response, Supervisor Trigger if has parent
+    await updateTaskStatus(taskId, "Done", {
+      kimiResponse: result.text,
+      triggerSupervisor: shouldTriggerSupervisor,
+    });
+
+    // If parent exists, also set Supervisor Trigger on parent (same pattern as Claude)
+    if (parentTaskId) {
       try {
         await notion.pages.update({
-          page_id: agentTaskId,
+          page_id: parentTaskId,
           properties: {
-            "Kimi Response": {
-              rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }],
-            },
-            // Supervisor Trigger handled by Notion automation on Kimi Response update
+            "Supervisor Trigger": { checkbox: true },
           },
         });
-        console.log(`Agent Task ${agentTaskId} updated with Kimi Response`);
+        console.log(`Supervisor Trigger set on parent task ${parentTaskId}`);
       } catch (e) {
-        console.warn("Failed to update Agent Task:", e);
+        console.warn("Failed to trigger supervisor on parent:", e);
       }
     }
 
     return Response.json({
       success: true,
+      taskId,
+      taskName,
       linkedPagesCount: fetchedPages.length,
       contextLength: fullContext.length,
       responseLength: result.text.length,
-      deliveredTo: sourcePageId ? "source" : "kimi-db",
-      targetPageId,
-      agentTaskTriggered: !!agentTaskId,
+      outputLocation,
+      supervisorTriggered: shouldTriggerSupervisor,
+      parentTaskId,
     });
   } catch (error) {
     console.error("kimi-webhook error:", error);
 
-    if (pageId) {
-      await updateKimiStatus(pageId, "Error", String(error));
+    if (taskId) {
+      await updateTaskStatus(taskId, "Error", { errorLog: String(error) });
     }
 
     return Response.json({ error: String(error) }, { status: 500 });
