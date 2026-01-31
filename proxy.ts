@@ -21,6 +21,10 @@ if (pathname === "/api/kimi-webhook") {
   return NextResponse.next();
 }
 
+  if (pathname === "/api/image-gen-webhook") {
+  return NextResponse.next();
+}
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
