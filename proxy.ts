@@ -17,11 +17,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   // Allow external webhooks (no cookies) to hit API routes directly
-if (pathname === "/api/kimi-webhook") {
-  return NextResponse.next();
-}
-
-  if (pathname === "/api/image-gen-webhook") {
+// Allow external webhooks (no cookies) to hit API routes directly
+if (pathname === "/api/kimi-webhook" || pathname === "/api/image-gen-webhook") {
   return NextResponse.next();
 }
 
