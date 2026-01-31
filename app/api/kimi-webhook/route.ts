@@ -7,38 +7,7 @@ import { getLanguageModel } from "@/lib/ai/providers";
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const n2m = new NotionToMarkdown({ notionClient: notion });
 
-// Webhook secret — move to env var in production
 const WEBHOOK_SECRET = process.env.KIMI_WEBHOOK_SECRET || "Hjdnjajndjsnanjn893dafdafwe";
-
-// Kimi System Prompt page ID — cached at module level
-const KIMI_SYSTEM_PROMPT_PAGE_ID = process.env.KIMI_SYSTEM_PROMPT_PAGE_ID || "";
-let cachedSystemContext: string | null = null;
-let systemContextLastFetch = 0;
-const SYSTEM_CONTEXT_CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
-
-// Fetch and cache the Kimi System Prompt page
-async function getKimiSystemContext(): Promise<string> {
-  const now = Date.now();
-  if (cachedSystemContext && now - systemContextLastFetch < SYSTEM_CONTEXT_CACHE_TTL) {
-    return cachedSystemContext;
-  }
-  try {
-    const pageId = KIMI_SYSTEM_PROMPT_PAGE_ID;
-    if (!pageId) {
-      console.warn("KIMI_SYSTEM_PROMPT_PAGE_ID not configured");
-      return "";
-    }
-    const mdBlocks = await n2m.pageToMarkdown(pageId);
-    const content = n2m.toMarkdownString(mdBlocks).parent;
-    cachedSystemContext = content;
-    systemContextLastFetch = now;
-    console.log(`Kimi System Prompt cached (${content.length} chars)`);
-    return content;
-  } catch (error) {
-    console.warn("Failed to fetch Kimi System Prompt:", error);
-    return cachedSystemContext || "";
-  }
-}
 
 function getHeader(req: Request, name: string) {
   return req.headers.get(name) ?? req.headers.get(name.toLowerCase());
@@ -146,7 +115,7 @@ async function appendResponseAsCallout(
         callout: {
           icon: { type: "emoji" as const, emoji: icon as any },
           color: color as any,
-          rich_text: [{ type: "text", text: { content: "Kimi:" } }],
+          rich_text: [], // No "Kimi:" prefix — icon is enough
         },
       },
     ],
@@ -170,7 +139,7 @@ async function appendResponseAsCallout(
   }
 }
 
-// Update Kimi DB page with status and optional error (MODULE LEVEL)
+// Update Kimi DB page with status and optional error
 async function updateKimiStatus(
   pageId: string,
   status: "Processing" | "Responded" | "Error",
@@ -225,8 +194,8 @@ export async function POST(request: Request) {
     // Fetch the Kimi DB page with full properties
     const page = (await notion.pages.retrieve({ page_id: pageId })) as any;
 
-    // Extract Description (note: has trailing space in property name)
-    const descriptionRichText = page.properties?.["Description "]?.rich_text || [];
+    // Extract Description
+    const descriptionRichText = page.properties?.["Description"]?.rich_text || [];
     const description = descriptionRichText.map((rt: any) => rt.plain_text).join("");
 
     // Extract Links — parse mentions from rich_text
@@ -238,15 +207,20 @@ export async function POST(request: Request) {
     const sourcePageIds = extractPageIdsFromRichText(sourceRichText);
     const sourcePageId = sourcePageIds[0] || null;
 
+    // Extract Agent Task relation (for agent → Kimi → Supervisor callback)
+    const agentTaskRelation = page.properties?.["Agent Task"]?.relation || [];
+    const agentTaskId = agentTaskRelation[0]?.id || null;
+
     console.log("Description:", description.slice(0, 200));
     console.log("Linked page IDs:", linkedPageIds);
     console.log("Source page ID:", sourcePageId);
+    console.log("Agent Task ID:", agentTaskId);
 
     if (!description && linkedPageIds.length === 0) {
       return Response.json({ error: "No description or links found" }, { status: 400 });
     }
 
-    // Build context from linked pages (increased to 10)
+    // Build context from linked pages (up to 10)
     const fetchedPages: { title: string; content: string }[] = [];
 
     for (const pid of linkedPageIds.slice(0, 10)) {
@@ -278,9 +252,7 @@ export async function POST(request: Request) {
     const fullContext = truncateContent(primaryPrompt + contextSection);
     console.log(`Full context length: ${fullContext.length} chars`);
 
-    // Fetch cached Kimi System Prompt
-    const kimiSystemContext = await getKimiSystemContext();
-
+    // System prompt (Router now handles workspace context on first message)
     const systemPrompt = `You are Kimi, an AI assistant answering questions for a Notion workspace.
 You have web search capability. When asked about current events, prices, documentation, or information that may have changed since your training, use web search to get up-to-date information.
 Your response will be converted to Notion blocks via markdown, so:
@@ -290,10 +262,7 @@ Your response will be converted to Notion blocks via markdown, so:
 - Use **bold** for emphasis, tables where helpful
 - Keep paragraphs concise — they render as individual blocks
 The user's question and instructions are provided below. Follow any specific output format or focus areas they request.
-Be direct, thorough, and actionable. Do not hedge or claim lack of access — all relevant context is provided.
----
-## Workspace Context (from Kimi System Prompt page)
-${kimiSystemContext}`;
+Be direct, thorough, and actionable. Do not hedge or claim lack of access — all relevant context is provided.`;
 
     // Call Kimi with web search enabled
     let result;
@@ -325,10 +294,10 @@ ${kimiSystemContext}`;
     await appendResponseAsCallout(targetPageId, result.text, "🦋", "purple_background");
     console.log(`Response written to: ${sourcePageId ? "Source page" : "Kimi DB entry"} (${targetPageId})`);
 
-    // Update status to Responded and store response
+    // Update status to Responded
     await updateKimiStatus(pageId, "Responded");
 
-    // Also store in Response property as backup
+    // Store response in Response property as backup
     try {
       await notion.pages.update({
         page_id: pageId,
@@ -343,6 +312,24 @@ ${kimiSystemContext}`;
       console.warn("Failed to update Response property:", e);
     }
 
+    // If Agent Task linked, write to Kimi Response and trigger Supervisor
+    if (agentTaskId) {
+      try {
+        await notion.pages.update({
+          page_id: agentTaskId,
+          properties: {
+            "Kimi Response": {
+              rich_text: [{ type: "text", text: { content: result.text.slice(0, 2000) } }],
+            },
+            "Supervisor Trigger": { checkbox: true },
+          },
+        });
+        console.log(`Agent Task ${agentTaskId} updated with Kimi Response + Supervisor Trigger`);
+      } catch (e) {
+        console.warn("Failed to update Agent Task:", e);
+      }
+    }
+
     return Response.json({
       success: true,
       linkedPagesCount: fetchedPages.length,
@@ -350,6 +337,7 @@ ${kimiSystemContext}`;
       responseLength: result.text.length,
       deliveredTo: sourcePageId ? "source" : "kimi-db",
       targetPageId,
+      agentTaskTriggered: !!agentTaskId,
     });
   } catch (error) {
     console.error("kimi-webhook error:", error);
